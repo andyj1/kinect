@@ -15,13 +15,15 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
 
+#include "transformation.h"
+#include "MultiDeviceCapturer.h"
+#include "colors.h"
+
 using std::cerr;
 using std::cout;
 using std::endl;
 using std::vector;
-
-#include "transformation.h"
-#include "MultiDeviceCapturer.h"
+using namespace color;
 
 // Allowing at least 160 microseconds between depth cameras should ensure they do not interfere with one another.
 constexpr uint32_t MIN_TIME_BETWEEN_DEPTH_CAMERA_PICTURES_USEC = 160;
@@ -58,7 +60,7 @@ static Transformation calibrate_devices(MultiDeviceCapturer &capturer,
 static k4a::image create_depth_image_like(const k4a::image &im);
 
 // custom functions
-void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body, ofstream &outfile);
+void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body, ofstream &outfile, cv::Mat& main, cv::Mat& secondary);
 void print_body_index_map_middle_line(k4a::image body_index_map);
 k4a_float3_t get_average_position_xyz(k4a_float3_t main_position, k4a_float3_t secondary_position, int main_or_secondary);
 k4a_quaternion_t get_average_quaternion_xyzw(k4a_quaternion_t main_quaternion, k4a_quaternion_t secondary_quaternion, int main_or_secondar);
@@ -377,7 +379,7 @@ int main(int argc, char **argv)
                         std::cout << main_body.id << " / " << secondary_body.id << std::endl;
                         if (main_body.id == secondary_body.id)
                         {
-                            print_body_information(main_body, secondary_body, outfile);
+                            print_body_information(main_body, secondary_body, outfile, cv_main_color_image, cv_secondary_color_image);
                         }
                         else
                         {
@@ -768,7 +770,7 @@ static k4a::image create_depth_image_like(const k4a::image &im)
 
 // =============== START body tracking functions
 
-void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body, ofstream& outfile)
+void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body, ofstream& outfile, cv::Mat& main, cv::Mat& secondary)
 {
     std::cout << "Main Body ID: " << main_body.id << std::endl;
     std::cout << "Secondary Body ID: " << secondary_body.id << std::endl;
@@ -791,11 +793,32 @@ void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body,
         else { avgCI = main_confidence_level; }
         printf("[Synced] Joint[%d]: Position[mm] ( %f, %f, %f ); Orientation ( %f, %f, %f, %f); Confidence Level (%d)  \n", i, avgPos.v[0], avgPos.v[1], avgPos.v[2], main_orientation.v[0], avgQuaternion.v[1], avgQuaternion.v[2], avgQuaternion.v[3], avgCI);
 
+
+        // ============ Display both joint streams in one RGB image ==========
+        // plot 2D points for main camera
+        int radius = 5;
+        cv::Point center = cv::Point(main_position.xyz.x, main_position.xyz.y);
+        cv::Scalar color = COLORS_red;
+        circle(main, center, radius, color, CV_FILLED);
+        radius = 5;
+        // cv::imshow("cv_main_color_image", main);
+        // cv::waitKey(1);
+
+        // plot 2D points for subordinate camera - 1
+        center = cv::Point(main_position.xyz.x, main_position.xyz.y);
+        color =  COLORS_blue;
+        // circle(secondary, center, radius, color, CV_FILLED);
+        circle(main, center, radius, color, CV_FILLED);
+
         if (outfile.is_open())
         {
             outfile << main_body.id << "," << i << "," << avgPos.v[0] << "," << avgPos.v[1] << "," << avgPos.v[2] << "," << avgQuaternion.v[0] << "," << avgQuaternion.v[1] << "," << avgQuaternion.v[2] << "," << avgQuaternion.v[3] << "," << confidenceEnumMapping(avgCI) << "," << endl;
         }
     }
+    cv::imshow("cv_main_color_image", main);
+    cv::waitKey(1);
+    cv::imshow("cv_secondary_color_image", secondary);
+    cv::waitKey(1);
 }
 
 void print_body_index_map_middle_line(k4a::image body_index_map)
