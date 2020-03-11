@@ -17,7 +17,6 @@
 // Handle to a k4a body tracking frame.
 #include <k4abttypes.h>
 
-
 #include <opencv2/calib3d.hpp>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
@@ -25,30 +24,30 @@
 
 #define FRAME_COUNT 10
 #define VERIFY(result, error)                                                                            \
-    if(result != K4A_RESULT_SUCCEEDED)                                                                   \
-    {                                                                                                    \
-        printf("%s \n - (File: %s, Function: %s, Line: %d)\n", error, __FILE__, __FUNCTION__, __LINE__); \
-        exit(1);                                                                                         \
-    };
+	if (result != K4A_RESULT_SUCCEEDED)                                                                  \
+	{                                                                                                    \
+		printf("%s \n - (File: %s, Function: %s, Line: %d)\n", error, __FILE__, __FUNCTION__, __LINE__); \
+		exit(1);                                                                                         \
+	};
 
 using namespace std;
 using namespace cv;
 
 static cv::Mat color_to_opencv(const k4a::image &im)
 {
-    cv::Mat cv_image_with_alpha(im.get_height_pixels(), im.get_width_pixels(), CV_8UC4, (void *)im.get_buffer());
-    cv::Mat cv_image_no_alpha;
-    cv::cvtColor(cv_image_with_alpha, cv_image_no_alpha, cv::COLOR_BGRA2BGR);
-    return cv_image_no_alpha;
+	cv::Mat cv_image_with_alpha(im.get_height_pixels(), im.get_width_pixels(), CV_8UC4, (void *)im.get_buffer());
+	cv::Mat cv_image_no_alpha;
+	cv::cvtColor(cv_image_with_alpha, cv_image_no_alpha, cv::COLOR_BGRA2BGR);
+	return cv_image_no_alpha;
 }
 
 static cv::Mat depth_to_opencv(const k4a::image &im)
 {
-    return cv::Mat(im.get_height_pixels(),
-                   im.get_width_pixels(),
-                   CV_16U,
-                   (void *)im.get_buffer(),
-                   static_cast<size_t>(im.get_stride_bytes()));
+	return cv::Mat(im.get_height_pixels(),
+				   im.get_width_pixels(),
+				   CV_16U,
+				   (void *)im.get_buffer(),
+				   static_cast<size_t>(im.get_stride_bytes()));
 }
 
 #undef main
@@ -80,13 +79,14 @@ int main()
 				// cv::Mat color_to_opencv_image = color_to_opencv(color_image);
 				// cout << color_to_opencv_image << endl;
 				// cv::imshow("actual color", color_to_opencv_image);
-        		// cv::waitKey(1);
+				// cv::waitKey(1);
 				// cout << "read color! " << endl;
-				
+
 				ir_image = sensor_capture.get_ir_image();
+				cv::cvtColor(ir_image, ir_image, COLOR_GRAY2RGB);
 				cv::Mat ir_depth_to_opencv_image = depth_to_opencv(ir_image);
 				cv::imshow("ir depth", ir_depth_to_opencv_image);
-        		cv::waitKey(0);
+				cv::waitKey(0);
 
 				Mat thr, gray, src;
 				src = ir_depth_to_opencv_image;
@@ -102,17 +102,16 @@ int main()
 				// cout << "converted to binary" << endl;
 
 				// find moments of the image
-				Moments m = cv::moments(thr,true);
-				Point p(m.m10/m.m00, m.m01/m.m00);
-				
-				// coordinates of centroid
-				cout<< cv::Mat(p)<< endl;
-				
-				// show the image with a point mark at the centroid
-				cv::circle(src, p, 5, Scalar(128,0,0), -1);
-				cv::imshow("Image with center",src);
-				cv::waitKey(0);
+				Moments m = cv::moments(thr, true);
+				Point p(m.m10 / m.m00, m.m01 / m.m00);
 
+				// coordinates of centroid
+				cout << cv::Mat(p) << endl;
+
+				// show the image with a point mark at the centroid
+				cv::circle(src, p, 5, Scalar(128, 0, 0), -1);
+				cv::imshow("Image with center", src);
+				cv::waitKey(0);
 
 				std::cout << "Start processing frame " << frame_count << std::endl;
 			}
@@ -126,10 +125,10 @@ int main()
 		std::cout << "Finished body tracking processing!" << std::endl;
 		device.close();
 	}
-	catch (const std::exception & e)
+	catch (const std::exception &e)
 	{
 		std::cerr << "Failed with exception:" << std::endl
-			<< "    " << e.what() << std::endl;
+				  << "    " << e.what() << std::endl;
 		return 1;
 	}
 
