@@ -62,7 +62,7 @@ static Transformation calibrate_devices(MultiDeviceCapturer &capturer,
 static k4a::image create_depth_image_like(const k4a::image &im);
 
 // custom functions
-void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body, ofstream &outfile, cv::Mat& main, cv::Mat& secondary);
+void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body, ofstream &outfile, ofstream& outfile2, cv::Mat& main, cv::Mat& secondary);
 void print_body_index_map_middle_line(k4a::image body_index_map);
 k4a_float3_t get_average_position_xyz(k4a_float3_t main_position, k4a_float3_t secondary_position, int main_or_secondary);
 k4a_quaternion_t get_average_quaternion_xyzw(k4a_quaternion_t main_quaternion, k4a_quaternion_t secondary_quaternion, int main_or_secondar);
@@ -75,9 +75,14 @@ int main(int argc, char **argv)
 {
     // output file stream
     ofstream outfile;
+    ofstream outfile2;
     outfile.open("./joints_output.csv", ios::out);
     outfile << ",,Position,,,Orientation,,,,Confidence Level" << endl;
     outfile << "Body ID," << "Joint #," << "x,y,z," << "x,y,z,w" << endl;
+
+    outfile2.open("./joints_output2.csv", ios::out);
+    outfile2 << ",,Position,,,Orientation,,,,Confidence Level" << endl;
+    outfile2 << "Body ID," << "Joint #," << "x,y,z," << "x,y,z,w" << endl;
 
     float chessboard_square_length = 0.; // must be included in the input params
     int32_t color_exposure_usec = 8000;  // somewhat reasonable default exposure time
@@ -385,7 +390,7 @@ int main(int argc, char **argv)
                         std::cout << main_body.id << " / " << secondary_body.id << std::endl;
                         if (main_body.id == secondary_body.id)
                         {
-                            print_body_information(main_body, secondary_body, outfile, cv_main_color_image, cv_secondary_color_image);
+                            print_body_information(main_body, secondary_body, outfile, outfile2, cv_main_color_image, cv_secondary_color_image);
                         }
                         else
                         {
@@ -421,6 +426,8 @@ int main(int argc, char **argv)
         cerr << "Invalid number of devices!" << endl;
         exit(1);
     }
+    outfile.close();
+    outfile2.close();
     return 0;
 }
 
@@ -779,7 +786,7 @@ static k4a::image create_depth_image_like(const k4a::image &im)
 
 // =============== START body tracking functions
 
-void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body, ofstream& outfile, cv::Mat& main, cv::Mat& secondary)
+void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body, ofstream& outfile, ofstream& outfile2, cv::Mat& main, cv::Mat& secondary)
 {
     std::cout << "Main Body ID: " << main_body.id << std::endl;
     std::cout << "Secondary Body ID: " << secondary_body.id << std::endl;
@@ -842,7 +849,11 @@ void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body,
 
         if (outfile.is_open())
         {
-            outfile << main_body.id << "," << i << "," << avgPos.v[0] << "," << avgPos.v[1] << "," << avgPos.v[2] << "," << avgQuaternion.v[0] << "," << avgQuaternion.v[1] << "," << avgQuaternion.v[2] << "," << avgQuaternion.v[3] << "," << confidenceEnumMapping(avgCI) << "," << endl;
+            outfile << main_body.id << "," << i << "," << main_position.v[0] << "," << main_position.v[1] << "," << main_position.v[2] << "," << main_orientation.v[0] << "," << main_orientation.v[1] << "," << main_orientation.v[2] << "," << main_orientation.v[3] << "," << confidenceEnumMapping(main_confidence_level) << "," << endl;
+        }
+        if (outfile2.is_open())
+        {
+            outfile2 << secondary_body.id << "," << i << "," << secondary_position.v[0] << "," << secondary_position.v[1] << "," << secondary_position.v[2] << "," << secondary_orientation.v[0] << "," << secondary_orientation.v[1] << "," << secondary_orientation.v[2] << "," << secondary_orientation.v[3] << "," << confidenceEnumMapping(secondary_confidence_level) << "," << endl;
         }
     }
     plotBody(dataMain, dataSecondary, main, secondary);

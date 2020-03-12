@@ -6,9 +6,8 @@ OUTPUT_FILENAME = -o program
 one:
 	g++ single.cpp  $(K4A_FLAGS) $(K4ABT_FLAGS)  $(OPENCV_FLAGS) $(OUTPUT_FILENAME)
 
-run: 
+onerun: 
 	./program
-
 
 two:
 	g++ multi.cpp  $(K4A_FLAGS) $(K4ABT_FLAGS)  $(OPENCV_FLAGS) $(OUTPUT_FILENAME)
@@ -16,3 +15,8 @@ two:
 tworun: 
 	./program 2 9 6 15 1
 
+getstreams:
+	g++ getTwoStreamsOutput.cpp $(K4A_FLAGS) $(K4ABT_FLAGS)  $(OPENCV_FLAGS)
+
+rungetstreams:
+	./a.out 2 9 6 15 1
