@@ -7,6 +7,7 @@
 #include <string>
 #include <chrono>
 #include <limits>
+#include <list>
 
 #include <k4a/k4a.hpp>
 #include <k4abt.hpp>
@@ -25,6 +26,7 @@ using std::endl;
 using std::vector;
 using namespace color;
 
+// cv::Point prevPt1 = cv::Point(0,0), prevPt2 = cv::Point(0,0);
 // Allowing at least 160 microseconds between depth cameras should ensure they do not interfere with one another.
 constexpr uint32_t MIN_TIME_BETWEEN_DEPTH_CAMERA_PICTURES_USEC = 160;
 
@@ -66,6 +68,8 @@ k4a_float3_t get_average_position_xyz(k4a_float3_t main_position, k4a_float3_t s
 k4a_quaternion_t get_average_quaternion_xyzw(k4a_quaternion_t main_quaternion, k4a_quaternion_t secondary_quaternion, int main_or_secondar);
 int get_average_confidence(k4abt_joint_confidence_level_t mainCI, k4abt_joint_confidence_level_t secondaryCI);
 string confidenceEnumMapping(k4abt_joint_confidence_level_t confidence_level);
+
+void plotBody(std::vector<cv::Point> dataMain, std::vector<cv::Point> dataSecondary, cv::Mat main, cv::Mat secondary);
 
 int main(int argc, char **argv)
 {
@@ -738,8 +742,8 @@ static Transformation calibrate_devices(MultiDeviceCapturer &capturer,
         cv::waitKey(1);
 
         // save image
-        cv::imwrite( "./cv_main_color_image.jpg", cv_main_color_image);
-        cv::imwrite( "./cv_secondary_color_image.jpg", cv_secondary_color_image);
+        // cv::imwrite( "./cv_main_color_image.jpg", cv_main_color_image);
+        // cv::imwrite( "./cv_secondary_color_image.jpg", cv_secondary_color_image);
         
 
 
@@ -774,6 +778,7 @@ void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body,
 {
     std::cout << "Main Body ID: " << main_body.id << std::endl;
     std::cout << "Secondary Body ID: " << secondary_body.id << std::endl;
+    std::vector<cv::Point> dataMain, dataSecondary;
     for (int i = 0; i < (int)K4ABT_JOINT_COUNT; i++)
     {
         k4a_float3_t main_position = main_body.skeleton.joints[i].position;
@@ -791,34 +796,275 @@ void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body,
         if (main_or_secondary == 0) { avgCI = main_confidence_level; }
         else if (main_or_secondary == 1) { avgCI = secondary_confidence_level; }
         else { avgCI = main_confidence_level; }
-        printf("[Synced] Joint[%d]: Position[mm] ( %f, %f, %f ); Orientation ( %f, %f, %f, %f); Confidence Level (%d)  \n", i, avgPos.v[0], avgPos.v[1], avgPos.v[2], main_orientation.v[0], avgQuaternion.v[1], avgQuaternion.v[2], avgQuaternion.v[3], avgCI);
+        // printf("[Synced] Joint[%d]: Position[mm] ( %f, %f, %f ); Orientation ( %f, %f, %f, %f); Confidence Level (%d)  \n", i, avgPos.v[0], avgPos.v[1], avgPos.v[2], main_orientation.v[0], avgQuaternion.v[1], avgQuaternion.v[2], avgQuaternion.v[3], avgCI);
 
 
         // ============ Display both joint streams in one RGB image ==========
         // plot 2D points for main camera
-        int radius = 5;
-        cv::Point center = cv::Point(main_position.xyz.x, main_position.xyz.y);
+        int radius = 10;
+        cv::Point center1 = cv::Point(main_position.xyz.x, main_position.xyz.y);
+        dataMain.push_back(center1);
+        // if (prevPt1 == cv::Point(0,0))
+        // {
+        //     prevPt1 = center1;
+        // }
         cv::Scalar color = COLORS_red;
-        circle(main, center, radius, color, CV_FILLED);
-        radius = 5;
-        // cv::imshow("cv_main_color_image", main);
-        // cv::waitKey(1);
+        circle(main, center1, radius, color, CV_FILLED);
+        putText(main, to_string(i), center1, FONT_HERSHEY_DUPLEX, 1, Scalar(0,143,143), 2);
+        // line( main, prevPt1, center1, Scalar( 110, 220, 0 ),  thickness, 8 );
+        // prevPt1 = center1;
+        cv::imshow("cv_main_color_image", main);
+        cv::waitKey(1);
 
         // plot 2D points for subordinate camera - 1
-        center = cv::Point(main_position.xyz.x, main_position.xyz.y);
+        radius = 5;
+        cv::Point center2 = cv::Point(main_position.xyz.x, main_position.xyz.y);
+        dataSecondary.push_back(center2);
+        // if (prevPt2 == cv::Point(0,0))
+        // {
+        //     prevPt2 = center2;
+        // }
         color =  COLORS_blue;
-        // circle(secondary, center, radius, color, CV_FILLED);
-        circle(main, center, radius, color, CV_FILLED);
+        circle(secondary, center2, radius, color, CV_FILLED);
+        putText(secondary, to_string(i), center2, FONT_HERSHEY_DUPLEX, 1, Scalar(0,143,143), 2);
+        // line( secondary, prevPt2, center2, Scalar( 110, 220, 0 ),  thickness, 8 );
+        // prevPt2 = center2;
+        cv::imshow("cv_secondary_color_image", secondary);
+        cv::waitKey(1);
 
         if (outfile.is_open())
         {
             outfile << main_body.id << "," << i << "," << avgPos.v[0] << "," << avgPos.v[1] << "," << avgPos.v[2] << "," << avgQuaternion.v[0] << "," << avgQuaternion.v[1] << "," << avgQuaternion.v[2] << "," << avgQuaternion.v[3] << "," << confidenceEnumMapping(avgCI) << "," << endl;
         }
     }
-    cv::imshow("cv_main_color_image", main);
+    plotBody(dataMain, dataSecondary, main, secondary);
+}
+
+void plotBody(std::vector<cv::Point> dataMain, std::vector<cv::Point> dataSecondary, cv::Mat main, cv::Mat secondary)
+{
+    cv::Scalar color; // green
+    int counter = 0, thickness = 0;
+    std::list<std::vector<cv::Point>> datalist {dataMain, dataSecondary};
+    std::vector<cv::Mat> imgList {main, secondary};
+    for (auto stream : datalist)
+    {
+        switch (counter)
+        {
+            case 0:
+                color = COLORS_red; 
+                thickness = 10;
+                break;
+            case 1:
+                color = COLORS_blue;
+                thickness = 3;
+                break;
+        }
+        // [child]: child joint to parent joint
+        // 1: spine naval to pelvis
+        line(imgList.at(0), stream[1], stream[0], color,  thickness, 8 );
+        // 2: spine chest to spine naval
+        line(imgList.at(0), stream[2], stream[1], color,  thickness, 8 );
+        // 3: neck to spine chest 
+        line(imgList.at(0), stream[3], stream[2], color,  thickness, 8 );
+        // 4: clavicle left to spine chest 
+        line(imgList.at(0), stream[4], stream[2], color,  thickness, 8 );
+        // 5: shoulder left to clavicle left
+        line(imgList.at(0), stream[5], stream[4], color,  thickness, 8 );
+        // 6: elbow left to shoulder left
+        line(imgList.at(0), stream[6], stream[5], color,  thickness, 8 );
+        // 7: wrist left to elbow left
+        line(imgList.at(0), stream[7], stream[6], color,  thickness, 8 );
+        // 8: hand left to wrist left
+        line(imgList.at(0), stream[8], stream[7], color,  thickness, 8 );
+        // 9: handtip left to hand left
+        line(imgList.at(0), stream[9], stream[8], color,  thickness, 8 );
+        // 10: thumb left to writst left
+        line(imgList.at(0), stream[10], stream[7], color,  thickness, 8 );
+        // 11: clavicle right to spine chest
+        line(imgList.at(0), stream[11], stream[2], color,  thickness, 8 );
+        // 12: shoulder right to clavicle right
+        line(imgList.at(0), stream[12], stream[11], color,  thickness, 8 );
+        // 13: elbow rith to shoulder right
+        line(imgList.at(0), stream[13], stream[12], color,  thickness, 8 );
+        // 14: wrist right to elbow right
+        line(imgList.at(0), stream[14], stream[13], color,  thickness, 8 );
+        // 15: hand right to wrist right
+        line(imgList.at(0), stream[15], stream[14], color,  thickness, 8 );
+        // 16: handtip right to hand right
+        line(imgList.at(0), stream[16], stream[15], color,  thickness, 8 );
+        // 17: thumb right to writst right
+        line(imgList.at(0), stream[17], stream[14], color,  thickness, 8 );
+        // 18: hip left to pelvis
+        line(imgList.at(0), stream[18], stream[0], color,  thickness, 8 );
+        // 19: knee left to hip left
+        line(imgList.at(0), stream[19], stream[18], color,  thickness, 8 );
+        // 20: ankle left to knee left
+        line(imgList.at(0), stream[20], stream[19], color,  thickness, 8 );
+        // 21: foot left to ankle left
+        line(imgList.at(0), stream[21], stream[20], color,  thickness, 8 );
+        // 22: hip right to plevis
+        line(imgList.at(0), stream[22], stream[0], color,  thickness, 8 );
+        // 23: knee right to hip right
+        line(imgList.at(0), stream[23], stream[22], color,  thickness, 8 );
+        // 24: ankle right to hip right
+        line(imgList.at(0), stream[24], stream[22], color,  thickness, 8 );
+        // 25: foot right to ankle right
+        line(imgList.at(0), stream[25], stream[24], color,  thickness, 8 );
+        // 26: head to neck
+        line(imgList.at(0), stream[26], stream[3], color,  thickness, 8 );
+        // 27: nose to head
+        line(imgList.at(0), stream[27], stream[26], color,  thickness, 8 );
+        // 28: eye left to head
+        line(imgList.at(0), stream[28], stream[26], color,  thickness, 8 );
+        // 29: ear left to head
+        line(imgList.at(0), stream[29], stream[26], color,  thickness, 8 );
+        // 30: eye right to head
+        line(imgList.at(0), stream[30], stream[26], color,  thickness, 8 );
+        // 31: ear right to head
+        line(imgList.at(0), stream[31], stream[26], color,  thickness, 8 );
+        counter += 1;
+    }
+
+    // std::vector<cv::Point> stream;
+    // stream = dataMain;
+    // color = COLORS_red;
+    // int thickness = 5; 
+    // // [child]: child joint to parent joint
+    // // 1: spine naval to pelvis
+    // line(imgList.at(0), stream[1], stream[0], color,  thickness, 8 );
+    // // 2: spine chest to spine naval
+    // line(imgList.at(0), stream[2], stream[1], color,  thickness, 8 );
+    // // 3: neck to spine chest 
+    // line(imgList.at(0), stream[3], stream[2], color,  thickness, 8 );
+    // // 4: clavicle left to spine chest 
+    // line(imgList.at(0), stream[4], stream[2], color,  thickness, 8 );
+    // // 5: shoulder left to clavicle left
+    // line(imgList.at(0), stream[5], stream[4], color,  thickness, 8 );
+    // // 6: elbow left to shoulder left
+    // line(imgList.at(0), stream[6], stream[5], color,  thickness, 8 );
+    // // 7: wrist left to elbow left
+    // line(imgList.at(0), stream[7], stream[6], color,  thickness, 8 );
+    // // 8: hand left to wrist left
+    // line(imgList.at(0), stream[8], stream[7], color,  thickness, 8 );
+    // // 9: handtip left to hand left
+    // line(imgList.at(0), stream[9], stream[8], color,  thickness, 8 );
+    // // 10: thumb left to writst left
+    // line(imgList.at(0), stream[10], stream[7], color,  thickness, 8 );
+    // // 11: clavicle right to spine chest
+    // line(imgList.at(0), stream[11], stream[2], color,  thickness, 8 );
+    // // 12: shoulder right to clavicle right
+    // line(imgList.at(0), stream[12], stream[11], color,  thickness, 8 );
+    // // 13: elbow rith to shoulder right
+    // line(imgList.at(0), stream[13], stream[12], color,  thickness, 8 );
+    // // 14: wrist right to elbow right
+    // line(imgList.at(0), stream[14], stream[13], color,  thickness, 8 );
+    // // 15: hand right to wrist right
+    // line(imgList.at(0), stream[15], stream[14], color,  thickness, 8 );
+    // // 16: handtip right to hand right
+    // line(imgList.at(0), stream[16], stream[15], color,  thickness, 8 );
+    // // 17: thumb right to writst right
+    // line(imgList.at(0), stream[17], stream[14], color,  thickness, 8 );
+    // // 18: hip left to pelvis
+    // line(imgList.at(0), stream[18], stream[0], color,  thickness, 8 );
+    // // 19: knee left to hip left
+    // line(imgList.at(0), stream[19], stream[18], color,  thickness, 8 );
+    // // 20: ankle left to knee left
+    // line(imgList.at(0), stream[20], stream[19], color,  thickness, 8 );
+    // // 21: foot left to ankle left
+    // line(imgList.at(0), stream[21], stream[20], color,  thickness, 8 );
+    // // 22: hip right to plevis
+    // line(imgList.at(0), stream[22], stream[0], color,  thickness, 8 );
+    // // 23: knee right to hip right
+    // line(imgList.at(0), stream[23], stream[22], color,  thickness, 8 );
+    // // 24: ankle right to hip right
+    // line(imgList.at(0), stream[24], stream[22], color,  thickness, 8 );
+    // // 25: foot right to ankle right
+    // line(imgList.at(0), stream[25], stream[24], color,  thickness, 8 );
+    // // 26: head to neck
+    // line(imgList.at(0), stream[26], stream[3], color,  thickness, 8 );
+    // // 27: nose to head
+    // line(imgList.at(0), stream[27], stream[26], color,  thickness, 8 );
+    // // 28: eye left to head
+    // line(imgList.at(0), stream[28], stream[26], color,  thickness, 8 );
+    // // 29: ear left to head
+    // line(imgList.at(0), stream[29], stream[26], color,  thickness, 8 );
+    // // 30: eye right to head
+    // line(imgList.at(0), stream[30], stream[26], color,  thickness, 8 );
+    // // 31: ear right to head
+    // line(imgList.at(0), stream[31], stream[26], color,  thickness, 8 );
+
+    // stream = dataSecondary;
+    // color = COLORS_blue; 
+    // thickness = 1; 
+    // // [child]: child joint to parent joint
+    // // 1: spine naval to pelvis
+    // line(imgList.at(0), stream[1], stream[0], color,  thickness, 8 );
+    // // 2: spine chest to spine naval
+    // line(imgList.at(0), stream[2], stream[1], color,  thickness, 8 );
+    // // 3: neck to spine chest 
+    // line(imgList.at(0), stream[3], stream[2], color,  thickness, 8 );
+    // // 4: clavicle left to spine chest 
+    // line(imgList.at(0), stream[4], stream[2], color,  thickness, 8 );
+    // // 5: shoulder left to clavicle left
+    // line(imgList.at(0), stream[5], stream[4], color,  thickness, 8 );
+    // // 6: elbow left to shoulder left
+    // line(imgList.at(0), stream[6], stream[5], color,  thickness, 8 );
+    // // 7: wrist left to elbow left
+    // line(imgList.at(0), stream[7], stream[6], color,  thickness, 8 );
+    // // 8: hand left to wrist left
+    // line(imgList.at(0), stream[8], stream[7], color,  thickness, 8 );
+    // // 9: handtip left to hand left
+    // line(imgList.at(0), stream[9], stream[8], color,  thickness, 8 );
+    // // 10: thumb left to writst left
+    // line(imgList.at(0), stream[10], stream[7], color,  thickness, 8 );
+    // // 11: clavicle right to spine chest
+    // line(imgList.at(0), stream[11], stream[2], color,  thickness, 8 );
+    // // 12: shoulder right to clavicle right
+    // line(imgList.at(0), stream[12], stream[11], color,  thickness, 8 );
+    // // 13: elbow rith to shoulder right
+    // line(imgList.at(0), stream[13], stream[12], color,  thickness, 8 );
+    // // 14: wrist right to elbow right
+    // line(imgList.at(0), stream[14], stream[13], color,  thickness, 8 );
+    // // 15: hand right to wrist right
+    // line(imgList.at(0), stream[15], stream[14], color,  thickness, 8 );
+    // // 16: handtip right to hand right
+    // line(imgList.at(0), stream[16], stream[15], color,  thickness, 8 );
+    // // 17: thumb right to writst right
+    // line(imgList.at(0), stream[17], stream[14], color,  thickness, 8 );
+    // // 18: hip left to pelvis
+    // line(imgList.at(0), stream[18], stream[0], color,  thickness, 8 );
+    // // 19: knee left to hip left
+    // line(imgList.at(0), stream[19], stream[18], color,  thickness, 8 );
+    // // 20: ankle left to knee left
+    // line(imgList.at(0), stream[20], stream[19], color,  thickness, 8 );
+    // // 21: foot left to ankle left
+    // line(imgList.at(0), stream[21], stream[20], color,  thickness, 8 );
+    // // 22: hip right to plevis
+    // line(imgList.at(0), stream[22], stream[0], color,  thickness, 8 );
+    // // 23: knee right to hip right
+    // line(imgList.at(0), stream[23], stream[22], color,  thickness, 8 );
+    // // 24: ankle right to hip right
+    // line(imgList.at(0), stream[24], stream[22], color,  thickness, 8 );
+    // // 25: foot right to ankle right
+    // line(imgList.at(0), stream[25], stream[24], color,  thickness, 8 );
+    // // 26: head to neck
+    // line(imgList.at(0), stream[26], stream[3], color,  thickness, 8 );
+    // // 27: nose to head
+    // line(imgList.at(0), stream[27], stream[26], color,  thickness, 8 );
+    // // 28: eye left to head
+    // line(imgList.at(0), stream[28], stream[26], color,  thickness, 8 );
+    // // 29: ear left to head
+    // line(imgList.at(0), stream[29], stream[26], color,  thickness, 8 );
+    // // 30: eye right to head
+    // line(imgList.at(0), stream[30], stream[26], color,  thickness, 8 );
+    // // 31: ear right to head
+    // line(imgList.at(0), stream[31], stream[26], color,  thickness, 8 );
+    cv::imshow("MAIN", imgList.at(0));
     cv::waitKey(1);
-    cv::imshow("cv_secondary_color_image", secondary);
-    cv::waitKey(1);
+    // cv::imshow("MAIN", secondary);
+    // cv::imshow("SECONDARY", secondary);
+    // cv::waitKey(1);
+
 }
 
 void print_body_index_map_middle_line(k4a::image body_index_map)
