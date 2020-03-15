@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+
+# dnn model
+*.onnx
+
+# vs code cache
+.vscode
