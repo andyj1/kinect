@@ -8,6 +8,9 @@
 #include <chrono>
 #include <limits>
 #include <list>
+#include <numeric> // accumulate
+#include <eigen3/Eigen/Dense> // matrix operations
+#include <eigen3/Eigen/SVD>
 
 #include <k4a/k4a.hpp>
 #include <k4abt.hpp>
@@ -25,8 +28,8 @@ using std::cout;
 using std::endl;
 using std::vector;
 using namespace color;
+using namespace Eigen;
 
-// cv::Point prevPt1 = cv::Point(0,0), prevPt2 = cv::Point(0,0);
 // Allowing at least 160 microseconds between depth cameras should ensure they do not interfere with one another.
 constexpr uint32_t MIN_TIME_BETWEEN_DEPTH_CAMERA_PICTURES_USEC = 160;
 
@@ -70,6 +73,8 @@ int get_average_confidence(k4abt_joint_confidence_level_t mainCI, k4abt_joint_co
 string confidenceEnumMapping(k4abt_joint_confidence_level_t confidence_level);
 
 void plotBody(std::vector<cv::Point> dataMain, std::vector<cv::Point> dataSecondary, cv::Mat main, cv::Mat secondary);
+void transform_body(k4abt_body_t& main_body, k4abt_body_t& secondary_body);
+std::vector<Eigen::MatrixXf> arun(Eigen::MatrixXf& main, Eigen::MatrixXf& secondary);
 
 int main(int argc, char **argv)
 {
@@ -390,6 +395,7 @@ int main(int argc, char **argv)
                         std::cout << main_body.id << " / " << secondary_body.id << std::endl;
                         if (main_body.id == secondary_body.id)
                         {
+                            transform_body(main_body, secondary_body);
                             print_body_information(main_body, secondary_body, outfile, outfile2, cv_main_color_image, cv_secondary_color_image);
                         }
                         else
@@ -784,8 +790,6 @@ static k4a::image create_depth_image_like(const k4a::image &im)
                               im.get_width_pixels() * static_cast<int>(sizeof(uint16_t)));
 }
 
-// =============== START body tracking functions
-
 void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body, ofstream& outfile, ofstream& outfile2, cv::Mat& main, cv::Mat& secondary)
 {
     std::cout << "Main Body ID: " << main_body.id << std::endl;
@@ -810,21 +814,14 @@ void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body,
         else { avgCI = main_confidence_level; }
         // printf("[Synced] Joint[%d]: Position[mm] ( %f, %f, %f ); Orientation ( %f, %f, %f, %f); Confidence Level (%d)  \n", i, avgPos.v[0], avgPos.v[1], avgPos.v[2], main_orientation.v[0], avgQuaternion.v[1], avgQuaternion.v[2], avgQuaternion.v[3], avgCI);
 
-
         // ============ Display both joint streams in one RGB image ==========
         // plot 2D points for main camera
         int radius = 10;
         cv::Point center1 = cv::Point(main_position.xyz.x, main_position.xyz.y);
         dataMain.push_back(center1);
-        // if (prevPt1 == cv::Point(0,0))
-        // {
-        //     prevPt1 = center1;
-        // }
         cv::Scalar color = COLORS_red;
         circle(main, center1, radius, color, CV_FILLED);
         putText(main, to_string(i), center1, FONT_HERSHEY_DUPLEX, 1, Scalar(0,143,143), 2);
-        // line( main, prevPt1, center1, Scalar( 110, 220, 0 ),  thickness, 8 );
-        // prevPt1 = center1;
         cv::namedWindow("cv_main_color_image", CV_WINDOW_AUTOSIZE);
         cv::imshow("cv_main_color_image", main);
         cv::waitKey(1);
@@ -833,16 +830,10 @@ void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body,
         radius = 5;
         cv::Point center2 = cv::Point(main_position.xyz.x, main_position.xyz.y);
         dataSecondary.push_back(center2);
-        // if (prevPt2 == cv::Point(0,0))
-        // {
-        //     prevPt2 = center2;
-        // }
         color =  COLORS_blue;
         circle(secondary, center2, radius, color, CV_FILLED);
         putText(secondary, to_string(i), center2, FONT_HERSHEY_DUPLEX, 1, Scalar(0,143,143), 2);
-        // line( secondary, prevPt2, center2, Scalar( 110, 220, 0 ),  thickness, 8 );
-        // prevPt2 = center2;
-
+        
         cv::namedWindow("cv_secondary_color_image", CV_WINDOW_AUTOSIZE);
         cv::imshow("cv_secondary_color_image", secondary);
         cv::waitKey(1);
@@ -880,7 +871,7 @@ void plotBody(std::vector<cv::Point> dataMain, std::vector<cv::Point> dataSecond
         }
         // [child]: child joint to parent joint
         // 1: spine naval to pelvis
-        line(imgList.at(0), stream[1], stream[0], color,  thickness, 8 );
+        line(imgList.at(0), stream[1], stream[0], color,  thickness, 8 ); // 8: line
         // 2: spine chest to spine naval
         line(imgList.at(0), stream[2], stream[1], color,  thickness, 8 );
         // 3: neck to spine chest
@@ -943,151 +934,81 @@ void plotBody(std::vector<cv::Point> dataMain, std::vector<cv::Point> dataSecond
         line(imgList.at(0), stream[31], stream[26], color,  thickness, 8 );
         counter += 1;
     }
-
-    // std::vector<cv::Point> stream;
-    // stream = dataMain;
-    // color = COLORS_red;
-    // int thickness = 5;
-    // // [child]: child joint to parent joint
-    // // 1: spine naval to pelvis
-    // line(imgList.at(0), stream[1], stream[0], color,  thickness, 8 );
-    // // 2: spine chest to spine naval
-    // line(imgList.at(0), stream[2], stream[1], color,  thickness, 8 );
-    // // 3: neck to spine chest
-    // line(imgList.at(0), stream[3], stream[2], color,  thickness, 8 );
-    // // 4: clavicle left to spine chest
-    // line(imgList.at(0), stream[4], stream[2], color,  thickness, 8 );
-    // // 5: shoulder left to clavicle left
-    // line(imgList.at(0), stream[5], stream[4], color,  thickness, 8 );
-    // // 6: elbow left to shoulder left
-    // line(imgList.at(0), stream[6], stream[5], color,  thickness, 8 );
-    // // 7: wrist left to elbow left
-    // line(imgList.at(0), stream[7], stream[6], color,  thickness, 8 );
-    // // 8: hand left to wrist left
-    // line(imgList.at(0), stream[8], stream[7], color,  thickness, 8 );
-    // // 9: handtip left to hand left
-    // line(imgList.at(0), stream[9], stream[8], color,  thickness, 8 );
-    // // 10: thumb left to writst left
-    // line(imgList.at(0), stream[10], stream[7], color,  thickness, 8 );
-    // // 11: clavicle right to spine chest
-    // line(imgList.at(0), stream[11], stream[2], color,  thickness, 8 );
-    // // 12: shoulder right to clavicle right
-    // line(imgList.at(0), stream[12], stream[11], color,  thickness, 8 );
-    // // 13: elbow rith to shoulder right
-    // line(imgList.at(0), stream[13], stream[12], color,  thickness, 8 );
-    // // 14: wrist right to elbow right
-    // line(imgList.at(0), stream[14], stream[13], color,  thickness, 8 );
-    // // 15: hand right to wrist right
-    // line(imgList.at(0), stream[15], stream[14], color,  thickness, 8 );
-    // // 16: handtip right to hand right
-    // line(imgList.at(0), stream[16], stream[15], color,  thickness, 8 );
-    // // 17: thumb right to writst right
-    // line(imgList.at(0), stream[17], stream[14], color,  thickness, 8 );
-    // // 18: hip left to pelvis
-    // line(imgList.at(0), stream[18], stream[0], color,  thickness, 8 );
-    // // 19: knee left to hip left
-    // line(imgList.at(0), stream[19], stream[18], color,  thickness, 8 );
-    // // 20: ankle left to knee left
-    // line(imgList.at(0), stream[20], stream[19], color,  thickness, 8 );
-    // // 21: foot left to ankle left
-    // line(imgList.at(0), stream[21], stream[20], color,  thickness, 8 );
-    // // 22: hip right to plevis
-    // line(imgList.at(0), stream[22], stream[0], color,  thickness, 8 );
-    // // 23: knee right to hip right
-    // line(imgList.at(0), stream[23], stream[22], color,  thickness, 8 );
-    // // 24: ankle right to hip right
-    // line(imgList.at(0), stream[24], stream[22], color,  thickness, 8 );
-    // // 25: foot right to ankle right
-    // line(imgList.at(0), stream[25], stream[24], color,  thickness, 8 );
-    // // 26: head to neck
-    // line(imgList.at(0), stream[26], stream[3], color,  thickness, 8 );
-    // // 27: nose to head
-    // line(imgList.at(0), stream[27], stream[26], color,  thickness, 8 );
-    // // 28: eye left to head
-    // line(imgList.at(0), stream[28], stream[26], color,  thickness, 8 );
-    // // 29: ear left to head
-    // line(imgList.at(0), stream[29], stream[26], color,  thickness, 8 );
-    // // 30: eye right to head
-    // line(imgList.at(0), stream[30], stream[26], color,  thickness, 8 );
-    // // 31: ear right to head
-    // line(imgList.at(0), stream[31], stream[26], color,  thickness, 8 );
-
-    // stream = dataSecondary;
-    // color = COLORS_blue;
-    // thickness = 1;
-    // // [child]: child joint to parent joint
-    // // 1: spine naval to pelvis
-    // line(imgList.at(0), stream[1], stream[0], color,  thickness, 8 );
-    // // 2: spine chest to spine naval
-    // line(imgList.at(0), stream[2], stream[1], color,  thickness, 8 );
-    // // 3: neck to spine chest
-    // line(imgList.at(0), stream[3], stream[2], color,  thickness, 8 );
-    // // 4: clavicle left to spine chest
-    // line(imgList.at(0), stream[4], stream[2], color,  thickness, 8 );
-    // // 5: shoulder left to clavicle left
-    // line(imgList.at(0), stream[5], stream[4], color,  thickness, 8 );
-    // // 6: elbow left to shoulder left
-    // line(imgList.at(0), stream[6], stream[5], color,  thickness, 8 );
-    // // 7: wrist left to elbow left
-    // line(imgList.at(0), stream[7], stream[6], color,  thickness, 8 );
-    // // 8: hand left to wrist left
-    // line(imgList.at(0), stream[8], stream[7], color,  thickness, 8 );
-    // // 9: handtip left to hand left
-    // line(imgList.at(0), stream[9], stream[8], color,  thickness, 8 );
-    // // 10: thumb left to writst left
-    // line(imgList.at(0), stream[10], stream[7], color,  thickness, 8 );
-    // // 11: clavicle right to spine chest
-    // line(imgList.at(0), stream[11], stream[2], color,  thickness, 8 );
-    // // 12: shoulder right to clavicle right
-    // line(imgList.at(0), stream[12], stream[11], color,  thickness, 8 );
-    // // 13: elbow rith to shoulder right
-    // line(imgList.at(0), stream[13], stream[12], color,  thickness, 8 );
-    // // 14: wrist right to elbow right
-    // line(imgList.at(0), stream[14], stream[13], color,  thickness, 8 );
-    // // 15: hand right to wrist right
-    // line(imgList.at(0), stream[15], stream[14], color,  thickness, 8 );
-    // // 16: handtip right to hand right
-    // line(imgList.at(0), stream[16], stream[15], color,  thickness, 8 );
-    // // 17: thumb right to writst right
-    // line(imgList.at(0), stream[17], stream[14], color,  thickness, 8 );
-    // // 18: hip left to pelvis
-    // line(imgList.at(0), stream[18], stream[0], color,  thickness, 8 );
-    // // 19: knee left to hip left
-    // line(imgList.at(0), stream[19], stream[18], color,  thickness, 8 );
-    // // 20: ankle left to knee left
-    // line(imgList.at(0), stream[20], stream[19], color,  thickness, 8 );
-    // // 21: foot left to ankle left
-    // line(imgList.at(0), stream[21], stream[20], color,  thickness, 8 );
-    // // 22: hip right to plevis
-    // line(imgList.at(0), stream[22], stream[0], color,  thickness, 8 );
-    // // 23: knee right to hip right
-    // line(imgList.at(0), stream[23], stream[22], color,  thickness, 8 );
-    // // 24: ankle right to hip right
-    // line(imgList.at(0), stream[24], stream[22], color,  thickness, 8 );
-    // // 25: foot right to ankle right
-    // line(imgList.at(0), stream[25], stream[24], color,  thickness, 8 );
-    // // 26: head to neck
-    // line(imgList.at(0), stream[26], stream[3], color,  thickness, 8 );
-    // // 27: nose to head
-    // line(imgList.at(0), stream[27], stream[26], color,  thickness, 8 );
-    // // 28: eye left to head
-    // line(imgList.at(0), stream[28], stream[26], color,  thickness, 8 );
-    // // 29: ear left to head
-    // line(imgList.at(0), stream[29], stream[26], color,  thickness, 8 );
-    // // 30: eye right to head
-    // line(imgList.at(0), stream[30], stream[26], color,  thickness, 8 );
-    // // 31: ear right to head
-    // line(imgList.at(0), stream[31], stream[26], color,  thickness, 8 );
-
     cv::namedWindow("MAIN", CV_WINDOW_AUTOSIZE);
     cv::imshow("MAIN", imgList.at(0));
     cv::waitKey(1);
-    // cv::imshow("MAIN", secondary);
-    // cv::imshow("SECONDARY", secondary);
-    // cv::waitKey(1);
 
 }
 
+void transform_body(k4abt_body_t& main_body, k4abt_body_t& secondary_body)
+{
+    // called per frame, for data stream containing body objects with 32 positions, orientations
+    // transform secondary to main body space coordinates
+    // using Arun's method for computing Rotation and Translation Matrices from positions (for 3dof) / orientations (for 6dof)
+    
+    // for each joint object
+    // k4a_float3_t main_position, secondary_position;
+    k4a_quaternion_t main_quaternion, secondary_quaternion;
+    
+    Eigen::MatrixXf main; // accumulate x,y,z of main body positions
+    Eigen::MatrixXf secondary; // accumulate x,y,z of secondary body positions
+
+    for (int joint=0; joint < (int)K4ABT_JOINT_COUNT; joint++)
+    {
+        main(0,joint) = main_body.skeleton.joints[joint].position.xyz.x;
+        main(1,joint) = main_body.skeleton.joints[joint].position.xyz.y;
+        main(2,joint) = main_body.skeleton.joints[joint].position.xyz.z;
+        secondary(0,joint) = secondary_body.skeleton.joints[joint].position.xyz.x;
+        secondary(1,joint) = secondary_body.skeleton.joints[joint].position.xyz.y;
+        secondary(2,joint) = secondary_body.skeleton.joints[joint].position.xyz.z;
+    }
+
+    // Arun's method
+    // R, T from secondary to main coordinate space
+    std::vector<Eigen::MatrixXf> arunResult = arun(main, secondary);
+    MatrixXf R = arunResult.at(0);
+    MatrixXf T = arunResult.at(1);
+    // main, secondary: [3 x 32]
+    MatrixXf secondary_tf = R*secondary + T;
+    
+    // reassign body object with transformed positions
+    for (int joint=0; joint < (int)K4ABT_JOINT_COUNT; joint++)
+    {
+        secondary_body.skeleton.joints[joint].position.xyz.x = secondary(0,joint);
+        secondary_body.skeleton.joints[joint].position.xyz.y = secondary(1,joint);
+        secondary_body.skeleton.joints[joint].position.xyz.z = secondary(2,joint);
+    }
+}
+
+std::vector<Eigen::MatrixXf> arun(Eigen::MatrixXf& main, Eigen::MatrixXf& secondary)
+{
+    std::vector<Eigen::MatrixXf> result;
+
+    // ======Arun's method START======
+    // find mean of positions x,y,z
+    Eigen::VectorXf avg_main = main.rowwise().mean();
+    Eigen::VectorXf avg_secondary = secondary.rowwise().mean();
+
+    // find deviations from mean
+    main -= avg_main;
+    secondary -= avg_secondary;
+
+    // take singular value decomposition and compute R and T matrices
+    JacobiSVD<MatrixXf> svd(secondary * main.transpose(), ComputeThinU | ComputeThinV);
+    MatrixXf u = svd.matrixU();
+    MatrixXf v = svd.matrixV();
+    MatrixXf s = svd.singularValues();
+
+    MatrixXf R = v * u.transpose();
+    MatrixXf T;
+    if (R.determinant()>0)
+    {
+        T = avg_main - R * avg_secondary;
+    }
+    // ======Arun's method END======
+    result.at(0) = R;
+    result.at(1) = T;
+}
 void print_body_index_map_middle_line(k4a::image body_index_map)
 {
     uint8_t* body_index_map_buffer = body_index_map.get_buffer();
@@ -1109,7 +1030,6 @@ void print_body_index_map_middle_line(k4a::image body_index_map)
     }
     std::cout << std::endl;
 }
-// ================ END body tracking functions
 
 k4a_float3_t get_average_position_xyz(k4a_float3_t main_position, k4a_float3_t secondary_position, int main_or_secondary)
 {
@@ -1173,6 +1093,8 @@ int get_average_confidence(k4abt_joint_confidence_level_t main_confidence_level,
     return main_or_secondary;
 }
 
+
+
 string confidenceEnumMapping(k4abt_joint_confidence_level_t confidence_level)
 {
 	string resultString;
@@ -1196,3 +1118,5 @@ string confidenceEnumMapping(k4abt_joint_confidence_level_t confidence_level)
 	}
 	return resultString;
 }
+
+
