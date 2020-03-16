@@ -36,3 +36,6 @@
 
 # vs code cache
 .vscode
+
+**/Azure-Kinect-Sensor-SDK/**
+**/Azure-Kinect-Samples/**
