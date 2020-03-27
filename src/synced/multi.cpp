@@ -421,6 +421,7 @@ int main(int argc, char **argv)
         cerr << "Invalid number of devices!" << endl;
         exit(1);
     }
+    outfile.close();
     return 0;
 }
 

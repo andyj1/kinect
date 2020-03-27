@@ -83,7 +83,7 @@ int main()
 
 	// output file stream
 	ofstream outfile;
-	outfile.open("./joints_output.csv", ios::out);
+	outfile.open("./joints_output_single.csv", ios::out);
 	outfile << ",,Position,,,Orientation,,,,Confidence Level" << endl;
 	outfile << "Body ID," << "Joint #," << "x,y,z," << "x,y,z,w" << endl;
 
