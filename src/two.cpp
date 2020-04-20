@@ -8,9 +8,8 @@
 #include <chrono>
 #include <limits>
 #include <list>
+#include <numeric> // accumulate
 
-#include <k4a/k4a.hpp>
-#include <k4abt.hpp>
 #include <opencv2/calib3d.hpp>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
@@ -19,14 +18,14 @@
 #include "transformation.h"
 #include "MultiDeviceCapturer.h"
 #include "colors.h"
+#include "two.hpp"
 
-using std::cerr;
-using std::cout;
-using std::endl;
-using std::vector;
 using namespace color;
+using namespace cv;
+using namespace std;
 
-// cv::Point prevPt1 = cv::Point(0,0), prevPt2 = cv::Point(0,0);
+static int ANGLE_FRAME_ROW_COUNT = 0;
+
 // Allowing at least 160 microseconds between depth cameras should ensure they do not interfere with one another.
 constexpr uint32_t MIN_TIME_BETWEEN_DEPTH_CAMERA_PICTURES_USEC = 160;
 
@@ -36,21 +35,21 @@ static cv::Mat depth_to_opencv(const k4a::image &im);
 static cv::Matx33f calibration_to_color_camera_matrix(const k4a::calibration &cal);
 static Transformation get_depth_to_color_transformation_from_calibration(const k4a::calibration &cal);
 static k4a::calibration construct_device_to_device_calibration(const k4a::calibration &main_cal,
-                                                               const k4a::calibration &secondary_cal,
-                                                               const Transformation &secondary_to_main);
+                                                            const k4a::calibration &secondary_cal,
+                                                            const Transformation &secondary_to_main);
 static vector<float> calibration_to_color_camera_dist_coeffs(const k4a::calibration &cal);
 static bool find_chessboard_corners_helper(const cv::Mat &main_color_image,
-                                           const cv::Mat &secondary_color_image,
-                                           const cv::Size &chessboard_pattern,
-                                           vector<cv::Point2f> &main_chessboard_corners,
-                                           vector<cv::Point2f> &secondary_chessboard_corners);
+                                        const cv::Mat &secondary_color_image,
+                                        const cv::Size &chessboard_pattern,
+                                        vector<cv::Point2f> &main_chessboard_corners,
+                                        vector<cv::Point2f> &secondary_chessboard_corners);
 static Transformation stereo_calibration(const k4a::calibration &main_calib,
-                                         const k4a::calibration &secondary_calib,
-                                         const vector<vector<cv::Point2f>> &main_chessboard_corners_list,
-                                         const vector<vector<cv::Point2f>> &secondary_chessboard_corners_list,
-                                         const cv::Size &image_size,
-                                         const cv::Size &chessboard_pattern,
-                                         float chessboard_square_length);
+                                        const k4a::calibration &secondary_calib,
+                                        const vector<vector<cv::Point2f>> &main_chessboard_corners_list,
+                                        const vector<vector<cv::Point2f>> &secondary_chessboard_corners_list,
+                                        const cv::Size &image_size,
+                                        const cv::Size &chessboard_pattern,
+                                        float chessboard_square_length);
 static k4a_device_configuration_t get_master_config();
 static k4a_device_configuration_t get_subordinate_config();
 static Transformation calibrate_devices(MultiDeviceCapturer &capturer,
@@ -62,22 +61,39 @@ static Transformation calibrate_devices(MultiDeviceCapturer &capturer,
 static k4a::image create_depth_image_like(const k4a::image &im);
 
 // custom functions
-void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body, ofstream &outfile, cv::Mat& main, cv::Mat& secondary);
 void print_body_index_map_middle_line(k4a::image body_index_map);
 k4a_float3_t get_average_position_xyz(k4a_float3_t main_position, k4a_float3_t secondary_position, int main_or_secondary);
 k4a_quaternion_t get_average_quaternion_xyzw(k4a_quaternion_t main_quaternion, k4a_quaternion_t secondary_quaternion, int main_or_secondar);
 int get_average_confidence(k4abt_joint_confidence_level_t mainCI, k4abt_joint_confidence_level_t secondaryCI);
 string confidenceEnumMapping(k4abt_joint_confidence_level_t confidence_level);
 
-void plotBody(std::vector<cv::Point> dataMain, std::vector<cv::Point> dataSecondary, cv::Mat main, cv::Mat secondary);
+void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body, cv::Mat& main, cv::Mat& secondary, cv::Matx33f main_intrinsic_matrix);
+void plotBody(std::vector<cv::Point> dataMain, std::vector<cv::Point> dataSecondary, std::vector<cv::Point> dataAvg, cv::Mat main, cv::Mat secondary);
+void transform_body(k4abt_body_t& main_body, k4abt_body_t& secondary_body);
+void arun(Mat& main, Mat& secondary, Mat& R, Mat& T);
 
 int main(int argc, char **argv)
 {
     // output file stream
     ofstream outfile;
-    outfile.open("./joints_output.csv", ios::out);
-    outfile << ",,Position,,,Orientation,,,,Confidence Level" << endl;
-    outfile << "Body ID," << "Joint #," << "x,y,z," << "x,y,z,w" << endl;
+    ofstream outfile2;
+    ofstream outfile_sync;
+    outfile.open("../saved_data/joints_sync_1.csv", ios::out);
+    outfile << ",,Position,,,Orientation,,,,Confidence Level" << std::endl;
+    outfile << "Body ID," << "Joint #," << "x,y,z," << "x,y,z,w" << std::endl;
+
+    outfile2.open("../saved_data/joints_sync_2.csv", ios::out);
+    outfile2 << ",,Position,,,Orientation,,,,Confidence Level" << std::endl;
+    outfile2 << "Body ID," << "Joint #," << "x,y,z," << "x,y,z,w" << std::endl;
+
+    outfile_sync.open("../saved_data/joints_sync_synced.csv", ios::out);
+    outfile_sync << ",,Position,,,Orientation,,,,Confidence Level" << std::endl;
+    outfile_sync << "Body ID," << "Joint #," << "x,y,z," << "x,y,z,w" << std::endl;
+
+    ofstream outfile_angles;
+    outfile_angles.open("../saved_data/joints_sync_angles.csv", ios::out);
+    outfile_angles << "Frame,A,B,C,D,E,F,G,H,I,J,K,L" << std::endl;
+    outfile_angles.close();
 
     float chessboard_square_length = 0.; // must be included in the input params
     int32_t color_exposure_usec = 8000;  // somewhat reasonable default exposure time
@@ -85,7 +101,7 @@ int main(int argc, char **argv)
     cv::Size chessboard_pattern(0, 0);   // height, width. Both need to be set.
     uint16_t depth_threshold = 1000;     // default to 1 meter
     size_t num_devices = 0;
-    double calibration_timeout = 60.0; // default to timing out after 60s of trying to get calibrated
+    double calibration_timeout = std::numeric_limits<double>::max(); // 60.0; // default to timing out after 60s of trying to get calibrated
     double greenscreen_duration = std::numeric_limits<double>::max(); // run forever
 
     vector<uint32_t> device_indices{ 0 }; // Set up a MultiDeviceCapturer to handle getting many synchronous captures
@@ -96,14 +112,14 @@ int main(int argc, char **argv)
 
     if (argc < 5)
     {
-        cout << "Usage: green_screen <num-cameras> <board-height> <board-width> <board-square-length> "
+        std::cout << "Usage: green_screen <num-cameras> <board-height> <board-width> <board-square-length> "
                 "[depth-threshold-mm (default 1000)] [color-exposure-time-usec (default 8000)] "
                 "[powerline-frequency-mode (default 2 for 60 Hz)] [calibration-timeout-sec (default 60)]"
                 "[greenscreen-duration-sec (default infinity- run forever)]"
-             << endl;
+             << std::endl;
 
         cerr << "Not enough arguments!\n";
-        exit(1);
+        std::exit(1);
     }
     else
     {
@@ -111,7 +127,7 @@ int main(int argc, char **argv)
         if (num_devices > k4a::device::get_installed_count())
         {
             cerr << "Not enough cameras plugged in!\n";
-            exit(1);
+            std::exit(1);
         }
         chessboard_pattern.height = atoi(argv[2]);
         chessboard_pattern.width = atoi(argv[3]);
@@ -129,10 +145,6 @@ int main(int argc, char **argv)
                     if (argc > 8)
                     {
                         calibration_timeout = atof(argv[8]);
-                        if (argc > 9)
-                        {
-                            greenscreen_duration = atof(argv[9]);
-                        }
                     }
                 }
             }
@@ -142,7 +154,7 @@ int main(int argc, char **argv)
     if (num_devices != 2 && num_devices != 1)
     {
         cerr << "Invalid choice for number of devices!\n";
-        exit(1);
+        std::exit(1);
     }
     else if (num_devices == 2)
     {
@@ -151,23 +163,23 @@ int main(int argc, char **argv)
     if (chessboard_pattern.height == 0)
     {
         cerr << "Chessboard height is not properly set!\n";
-        exit(1);
+        std::exit(1);
     }
     if (chessboard_pattern.width == 0)
     {
         cerr << "Chessboard height is not properly set!\n";
-        exit(1);
+        std::exit(1);
     }
     if (chessboard_square_length == 0.)
     {
         cerr << "Chessboard square size is not properly set!\n";
-        exit(1);
+        std::exit(1);
     }
 
-    cout << "Chessboard height: " << chessboard_pattern.height << ". Chessboard width: " << chessboard_pattern.width
-         << ". Chessboard square length: " << chessboard_square_length << endl;
-    cout << "Depth threshold: : " << depth_threshold << ". Color exposure time: " << color_exposure_usec
-         << ". Powerline frequency mode: " << powerline_freq << endl;
+    std::cout << "Chessboard height: " << chessboard_pattern.height << ". Chessboard width: " << chessboard_pattern.width
+         << ". Chessboard square length: " << chessboard_square_length << std::endl;
+    std::cout << "Depth threshold: : " << depth_threshold << ". Color exposure time: " << color_exposure_usec
+         << ". Powerline frequency mode: " << powerline_freq << std::endl;
 
     MultiDeviceCapturer capturer(device_indices, color_exposure_usec, powerline_freq);
 
@@ -194,38 +206,7 @@ int main(int argc, char **argv)
     cv::Mat background_image = color_to_opencv(background_captures[0].get_color_image());
     cv::Mat output_image = background_image.clone(); // allocated outside the loop to avoid re-creating every time
 
-    if (num_devices == 1)
-    {
-        std::chrono::time_point<std::chrono::system_clock> start_time = std::chrono::system_clock::now();
-        while (std::chrono::duration<double>(std::chrono::system_clock::now() - start_time).count() <
-               greenscreen_duration)
-        {
-            vector<k4a::capture> captures;
-            // secondary_config isn't actually used here because there's no secondary device but the function needs it
-            captures = capturer.get_synchronized_captures(secondary_config, true);
-            k4a::image main_color_image = captures[0].get_color_image();
-            k4a::image main_depth_image = captures[0].get_depth_image();
-
-            // let's green screen out things that are far away.
-            // first: let's get the main depth image into the color camera space
-            k4a::image main_depth_in_main_color = create_depth_image_like(main_color_image);
-            main_depth_to_main_color.depth_image_to_color_camera(main_depth_image, &main_depth_in_main_color);
-            cv::Mat cv_main_depth_in_main_color = depth_to_opencv(main_depth_in_main_color);
-            cv::Mat cv_main_color_image = color_to_opencv(main_color_image);
-
-            // single-camera case
-            cv::Mat within_threshold_range = (cv_main_depth_in_main_color != 0) &
-                                             (cv_main_depth_in_main_color < depth_threshold);
-            // show the close details
-            cv_main_color_image.copyTo(output_image, within_threshold_range);
-            // hide the rest with the background image
-            background_image.copyTo(output_image, ~within_threshold_range);
-            cv::namedWindow("Green Screen");
-            cv::imshow("Green Screen", output_image);
-            cv::waitKey(1);
-        }
-    }
-    else if (num_devices == 2)
+    if (num_devices == 2)
     {
         // This wraps all the device-to-device details
         Transformation tr_secondary_color_to_main_color = calibrate_devices(capturer,
@@ -234,19 +215,6 @@ int main(int argc, char **argv)
                                                                             chessboard_pattern,
                                                                             chessboard_square_length,
                                                                             calibration_timeout);
-        // save matrix
-        // const char* filename1 = "./RotationMatrix.txt";
-        // ofstream file1(filename1);
-        // file1 <<"" << cv::format(tr_secondary_color_to_main_color.R, cv::Formatter::FMT_CSV);
-        // file1.close();
-
-        // const char* filename2 = "./TranslationMatrix.txt";
-        // ofstream file2(filename2);
-        // file2 <<"" << cv::format(tr_secondary_color_to_main_color.t, cv::Formatter::FMT_CSV);
-        // file2.close();
-        // exit(1);
-
-
         k4a::calibration secondary_calibration =
             capturer.get_subordinate_device_by_index(0).get_calibration(secondary_config.depth_mode,
                                                                         secondary_config.color_resolution);
@@ -267,12 +235,10 @@ int main(int argc, char **argv)
                                                    tr_secondary_depth_to_main_color);
         k4a::transformation secondary_depth_to_main_color(secondary_depth_to_main_color_cal);
 
-        // ============ START initialize body tracker
+        // ============ initialize body tracker
         k4abt::tracker main_tracker = k4abt::tracker::create(main_calibration);
         k4abt::tracker secondary_tracker = k4abt::tracker::create(secondary_calibration);
-        // ============ END initialize body tracker
-
-
+        
         k4abt_body_t main_body;
         k4abt_body_t secondary_body;
         k4abt::frame main_body_frame;
@@ -282,35 +248,37 @@ int main(int argc, char **argv)
         while (std::chrono::duration<double>(std::chrono::system_clock::now() - start_time).count() <
                greenscreen_duration)
         {
-
             vector<k4a::capture> captures;
             captures = capturer.get_synchronized_captures(secondary_config, true);
             // get main color and depth image
             k4a::image main_color_image = captures[0].get_color_image();
+            cv::Mat cv_main_color_image = color_to_opencv(main_color_image);
+
             k4a::image main_depth_image = captures[0].get_depth_image();
+            
             // get secondary color and depth image
             k4a::image secondary_color_image = captures[1].get_color_image();
+            cv::Mat cv_secondary_color_image = color_to_opencv(secondary_color_image);
+
             k4a::image secondary_depth_image = captures[1].get_depth_image();
 
             // let's green screen out things that are far away.
-            // first: let's get the main depth image into the color camera space
+            // Get the main depth image into the main color camera space
             k4a::image main_depth_in_main_color = create_depth_image_like(main_color_image);
+            // main_depth_to_main_color from main camera calibration (extrinsic[DEPTH][COLOR])
             main_depth_to_main_color.depth_image_to_color_camera(main_depth_image, &main_depth_in_main_color);
             cv::Mat cv_main_depth_in_main_color = depth_to_opencv(main_depth_in_main_color);
-            cv::Mat cv_main_color_image = color_to_opencv(main_color_image);
+            
+            // Get the secondary depth image in the main color perspective
+            // k4a::image secondary_depth_in_main_color = create_depth_image_like(main_color_image);
+            // secondary_depth_to_main_color from secondary camera calibration (extrinsic[DEPTH][COLOR])
+            // secondary_depth_to_main_color.depth_image_to_color_camera(secondary_depth_image, &secondary_depth_in_main_color);
+            // cv::Mat cv_secondary_depth_in_main_color = depth_to_opencv(secondary_depth_in_main_color);
 
-
-            // Get the depth image in the main color perspective
-            k4a::image secondary_depth_in_main_color = create_depth_image_like(main_color_image);
-            secondary_depth_to_main_color.depth_image_to_color_camera(secondary_depth_image,
-                                                                      &secondary_depth_in_main_color);
-            cv::Mat cv_secondary_depth_in_main_color = depth_to_opencv(secondary_depth_in_main_color);
-
-            k4a::image secondary_depth_in_secondary_color = create_depth_image_like(secondary_color_image);
-            main_depth_to_main_color.depth_image_to_color_camera(secondary_depth_image, &secondary_depth_in_secondary_color);
-            cv::Mat cv_secondary_depth_in_secondary_color = depth_to_opencv(secondary_depth_in_secondary_color);
-            cv::Mat cv_secondary_color_image = color_to_opencv(secondary_color_image);
-
+            // k4a::image secondary_depth_in_secondary_color = create_depth_image_like(secondary_color_image);
+            // secondary_depth_to_main_color.depth_image_to_color_camera(secondary_depth_image, &secondary_depth_in_secondary_color);
+            // cv::Mat cv_secondary_depth_in_secondary_color = depth_to_opencv(secondary_depth_in_secondary_color);
+            
             // opencv secondary color Mat / opencv main color Mat
             cv::namedWindow("cv_secondary_color_image", CV_WINDOW_AUTOSIZE);
             cv::imshow("cv_secondary_color_image", cv_secondary_color_image);
@@ -325,15 +293,53 @@ int main(int argc, char **argv)
             // captures[1].set_depth_image(secondary_depth_in_secondary_color);
 
             // ========== START read skeletal data
+            const k4a_calibration_intrinsic_parameters_t::_param &main_i = main_calibration.color_camera_calibration.intrinsics.parameters.param;
+            const k4a_calibration_intrinsic_parameters_t::_param &secondary_i = main_calibration.color_camera_calibration.intrinsics.parameters.param;
+            
+            cv::Matx33f main_intrinstic_matrix = cv::Matx33f::eye();
+            cv::Matx33f secondary_intrinstic_matrix = cv::Matx33f::eye();
+            
+            main_intrinstic_matrix(0, 0) = main_i.fx;
+            main_intrinstic_matrix(1, 1) = main_i.fy;
+            main_intrinstic_matrix(0, 2) = main_i.cx;
+            main_intrinstic_matrix(1, 2) = main_i.cy;
+            
+            secondary_intrinstic_matrix(0, 0) = secondary_i.fx;
+            secondary_intrinstic_matrix(1, 1) = secondary_i.fy;
+            secondary_intrinstic_matrix(0, 2) = secondary_i.cx;
+            secondary_intrinstic_matrix(1, 2) = secondary_i.cy;
+            
+            // std::cout << "Intrinsic parameters:" << endl;
+            // std::cout << main_intrinstic_matrix << endl;
+            // std::cout << secondary_intrinstic_matrix << endl;
+
+            const k4a_calibration_extrinsics_t &main_ext = main_calibration.extrinsics[K4A_CALIBRATION_TYPE_DEPTH][K4A_CALIBRATION_TYPE_COLOR];
+            const k4a_calibration_extrinsics_t &secondary_ext = secondary_calibration.extrinsics[K4A_CALIBRATION_TYPE_DEPTH][K4A_CALIBRATION_TYPE_COLOR];
+            Transformation main_ext_tr, secondary_ext_tr;
+            for (int i = 0; i < 3; ++i)
+            {
+                for (int j = 0; j < 3; ++j)
+                {
+                    main_ext_tr.R(i, j) = main_ext.rotation[i * 3 + j];
+                    secondary_ext_tr.R(i, j) = secondary_ext.rotation[i * 3 + j];
+                }
+            }
+            main_ext_tr.t = cv::Vec3d(main_ext.translation[0], main_ext.translation[1], main_ext.translation[2]);
+            secondary_ext_tr.t = cv::Vec3d(secondary_ext.translation[0], secondary_ext.translation[1], secondary_ext.translation[2]);
+
+            // std::cout << "Extrinsic parameters:" << endl;
+            // std::cout << main_ext_tr.R << endl;
+            // std::cout << main_ext_tr.t << endl;
+            // std::cout << secondary_ext_tr.R << endl;
+            // std::cout << secondary_ext_tr.t << endl;
 
             // read from main and secondary trackers
-            if (!main_tracker.enqueue_capture(captures[0]))
+            if (!main_tracker.enqueue_capture(captures[0], std::chrono::milliseconds(K4A_WAIT_INFINITE)))
             {
                 // It should never hit timeout when K4A_WAIT_INFINITE is set.
-                std::cout << "Error! Add capture to tracker process queue timeout!" << std::endl;
+                 std::cout << "Error! Add capture to tracker process queue timeout!" << std::endl;
                 break;
             }
-            // std::cout << "checkpoint - 1\n" << std::endl;
             uint32_t main_num_bodies;
             uint32_t secondary_num_bodies;
             try
@@ -341,18 +347,16 @@ int main(int argc, char **argv)
                 try
                 {
                     main_body_frame = main_tracker.pop_result();
-                    // std::cout << "checkpoint - 2a\n" << std::endl;
                 }
                 catch(const std::exception& e)
                 {
                     std::cerr << e.what() << '\n';
                 }
 
-                secondary_tracker.enqueue_capture(captures[1]);
+                secondary_tracker.enqueue_capture(captures[1], std::chrono::milliseconds(K4A_WAIT_INFINITE));
                 try
                 {
                     secondary_body_frame = secondary_tracker.pop_result();
-                    // std::cout << "checkpoint - 2b\n" << std::endl;
                 }
                 catch(const std::exception& e)
                 {
@@ -364,28 +368,64 @@ int main(int argc, char **argv)
                 {
                     main_num_bodies = main_body_frame.get_num_bodies();
                     secondary_num_bodies = secondary_body_frame.get_num_bodies();
-                    // std::cout << "checkpoint - 3\n" << std::endl;
                 }
 
-                // std::cout << "main num bodies found: " << main_num_bodies << std::endl;
-                // std::cout << "secondary num bodies found: " << secondary_num_bodies << std::endl;
+                //  std::cout << "main num bodies found: " << main_num_bodies << std::endl;
+                //  std::cout << "secondary num bodies found: " << secondary_num_bodies << std::endl;
 
                 if (main_num_bodies > 0 && secondary_num_bodies > 0)
                 {
                     uint32_t num_bodies_min = std::min(main_num_bodies, secondary_num_bodies);
-                    std::cout << num_bodies_min << " bodies are detected!" << std::endl;
+                     std::cout << num_bodies_min << " bodies detected!" << std::endl;
 
-                    // std::cout << "checkpoint - 4\n" << std::endl;
                     for (uint32_t i = 0; i < num_bodies_min; i++)
                     {
                         main_body = main_body_frame.get_body(i);
                         secondary_body = secondary_body_frame.get_body(i);
 
                         // print body information
-                        std::cout << main_body.id << " / " << secondary_body.id << std::endl;
+                         std::cout << "[Body ID] main >> " << main_body.id << " / sub >> " << secondary_body.id << std::endl;
                         if (main_body.id == secondary_body.id)
                         {
-                            print_body_information(main_body, secondary_body, outfile, cv_main_color_image, cv_secondary_color_image);
+                            // insert original joints data streams
+                            for (int i = 0; i < (int)K4ABT_JOINT_COUNT; i++)
+                            {
+                                k4a_float3_t main_position = main_body.skeleton.joints[i].position;
+                                k4a_quaternion_t main_orientation = main_body.skeleton.joints[i].orientation;
+                                k4abt_joint_confidence_level_t main_confidence_level = main_body.skeleton.joints[i].confidence_level;
+
+                                k4a_float3_t secondary_position = secondary_body.skeleton.joints[i].position;
+                                k4a_quaternion_t secondary_orientation = secondary_body.skeleton.joints[i].orientation;
+                                k4abt_joint_confidence_level_t secondary_confidence_level = secondary_body.skeleton.joints[i].confidence_level;
+
+                                if (outfile.is_open())
+                                {
+                                    outfile << main_body.id << "," << i << "," << main_position.v[0] << "," << main_position.v[1] << "," << main_position.v[2] << "," << main_orientation.v[0] << "," << main_orientation.v[1] << "," << main_orientation.v[2] << "," << main_orientation.v[3] << "," << confidenceEnumMapping(main_confidence_level) << "," << std::endl;
+                                }
+                                if (outfile2.is_open())
+                                {
+                                    outfile2 << secondary_body.id << "," << i << "," << secondary_position.v[0] << "," << secondary_position.v[1] << "," << secondary_position.v[2] << "," << secondary_orientation.v[0] << "," << secondary_orientation.v[1] << "," << secondary_orientation.v[2] << "," << secondary_orientation.v[3] << "," << confidenceEnumMapping(secondary_confidence_level) << "," << std::endl;
+                                }
+                            }
+
+                            // apply transformation to secondary to convert to main color camera space
+                            transform_body(main_body, secondary_body);
+
+                            // insert transformed joints data stream
+                            for (int i = 0; i < (int)K4ABT_JOINT_COUNT; i++)
+                            {
+                                k4a_float3_t secondary_tf_position = secondary_body.skeleton.joints[i].position;
+                                k4a_quaternion_t secondary_tf_orientation = secondary_body.skeleton.joints[i].orientation;
+                                k4abt_joint_confidence_level_t secondary_tf_confidence_level = secondary_body.skeleton.joints[i].confidence_level;
+
+                                if (outfile_sync.is_open())
+                                {
+                                    outfile_sync << secondary_body.id << "," << i << "," << secondary_tf_position.v[0] << "," << secondary_tf_position.v[1] << "," << secondary_tf_position.v[2] << "," << secondary_tf_orientation.v[0] << "," << secondary_tf_orientation.v[1] << "," << secondary_tf_orientation.v[2] << "," << secondary_tf_orientation.v[3] << "," << confidenceEnumMapping(secondary_tf_confidence_level) << "," << std::endl;
+                                }
+                            }
+                            
+                            // printout / display
+                            print_body_information(main_body, secondary_body, cv_main_color_image, cv_secondary_color_image, main_intrinstic_matrix);
                         }
                         else
                         {
@@ -397,7 +437,7 @@ int main(int argc, char **argv)
                 else
                 {
                     //  It should never hit timeout when K4A_WAIT_INFINITE is set.
-                    std::cout << "Error! Pop body frame result time out!" << std::endl;
+                     std::cout << "Error! Pop body frame result time out!" << std::endl;
                     continue;
                 }
             }
@@ -406,22 +446,16 @@ int main(int argc, char **argv)
                 std::cerr << e.what() << '\n';
             }
             // ========== END read skeletal data
-
-
-            // cv::imshow("cv_secondary_depth_image", cv_secondary_depth_in_main_color);
-            // cv::waitKey(1);
-            // cv::imshow("cv_main_depth_image", cv_main_depth_in_main_color);
-            // cv::waitKey(1);
-
-            // exit(0);
         }
+        outfile.close();
+        outfile2.close();
+        outfile_sync.close();
     }
     else
     {
-        cerr << "Invalid number of devices!" << endl;
-        exit(1);
+        std::cerr << "Invalid number of devices!" << std::endl;
+        std::exit(1);
     }
-    outfile.close();
     return 0;
 }
 
@@ -518,17 +552,17 @@ bool find_chessboard_corners_helper(const cv::Mat &main_color_image,
     {
         if (found_chessboard_main)
         {
-            cout << "Could not find the chessboard corners in the secondary image. Trying again...\n";
+            std::cout << "Could not find the chessboard corners in the secondary image. Trying again...\n";
         }
         // Likewise, if the chessboard was found in the secondary image, it was not found in the main image.
         else if (found_chessboard_secondary)
         {
-            cout << "Could not find the chessboard corners in the main image. Trying again...\n";
+            std::cout << "Could not find the chessboard corners in the main image. Trying again...\n";
         }
         // The only remaining case is the corners were in neither image.
         else
         {
-            cout << "Could not find the chessboard corners in either image. Trying again...\n";
+            std::cout << "Could not find the chessboard corners in either image. Trying again...\n";
         }
         return false;
     }
@@ -593,7 +627,7 @@ Transformation stereo_calibration(const k4a::calibration &main_calib,
     }
 
     // Calibrating the cameras requires a lot of data. OpenCV's stereoCalibrate function requires:
-    // - a list of points in real 3d space that will be used to calibrate*
+    // - a list of points in reatr_secondary_color_to_main_colorl 3d space that will be used to calibrate*
     // - a corresponding list of pixel coordinates as seen by the first camera*
     // - a corresponding list of pixel coordinates as seen by the second camera*
     // - the camera matrix of the first camera
@@ -639,8 +673,8 @@ Transformation stereo_calibration(const k4a::calibration &main_calib,
                                        cv::noArray(),
                                        cv::noArray(),
                                        cv::CALIB_FIX_INTRINSIC | cv::CALIB_RATIONAL_MODEL | cv::CALIB_CB_FAST_CHECK);
-    cout << "Finished calibrating!\n";
-    cout << "Got error of " << error << "\n";
+    std::cout << "Finished calibrating!\n";
+    std::cout << "Got error of " << error << "\n";
     return tr;
 }
 
@@ -751,12 +785,10 @@ static Transformation calibrate_devices(MultiDeviceCapturer &capturer,
         // cv::imwrite( "./cv_main_color_image.jpg", cv_main_color_image);
         // cv::imwrite( "./cv_secondary_color_image.jpg", cv_secondary_color_image);
 
-
-
         // Get 20 frames before doing calibration.
         if (main_chessboard_corners_list.size() >= 20)
         {
-            cout << "Calculating calibration..." << endl;
+            std::cout << "Calculating calibration..." << std::endl;
             return stereo_calibration(main_calibration,
                                       secondary_calibration,
                                       main_chessboard_corners_list,
@@ -767,7 +799,7 @@ static Transformation calibrate_devices(MultiDeviceCapturer &capturer,
         }
     }
     std::cerr << "Calibration timed out !\n ";
-    exit(1);
+    std::exit(1);
 }
 
 static k4a::image create_depth_image_like(const k4a::image &im)
@@ -778,13 +810,256 @@ static k4a::image create_depth_image_like(const k4a::image &im)
                               im.get_width_pixels() * static_cast<int>(sizeof(uint16_t)));
 }
 
-// =============== START body tracking functions
-
-void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body, ofstream& outfile, cv::Mat& main, cv::Mat& secondary)
+void crossproduct (cv::Vec3f &ans, cv::Vec3f &p1, cv::Vec3f &p2)
 {
-    std::cout << "Main Body ID: " << main_body.id << std::endl;
-    std::cout << "Secondary Body ID: " << secondary_body.id << std::endl;
-    std::vector<cv::Point> dataMain, dataSecondary;
+    ans[0] = p1[1]*p2[2] -p1[2]*p2[1];
+    ans[1] = p1[0]*p2[2] -p1[2]*p2[0];
+    ans[2] = p1[0]*p2[1] -p1[1]*p2[0];
+}
+std::vector<float> computeJointAngles(std::vector<cv::Point3f> avg_points)
+{
+    // plot angles from 3D positions
+    // A: 12-13-14
+    cv::Vec3f a1(avg_points[12].x - avg_points[13].x, \
+                 avg_points[12].y - avg_points[13].y, \
+                 avg_points[12].z - avg_points[13].z);
+    cv::Vec3f a2(avg_points[13].x - avg_points[14].x, \
+                 avg_points[13].y - avg_points[14].y, \
+                 avg_points[13].z - avg_points[14].z);
+    cv::Vec3f across;
+    crossproduct(across, a1, a2);
+    float adot = a1.dot(a2);
+    float A = atan2(norm(across), adot);
+
+    // B: 5-6-7
+    cv::Vec3f b1(avg_points[5].x - avg_points[6].x, \
+                 avg_points[5].y - avg_points[6].y, \
+                 avg_points[5].z - avg_points[6].z);
+    cv::Vec3f b2(avg_points[6].x - avg_points[7].x, \
+                 avg_points[6].y - avg_points[7].y, \
+                 avg_points[6].z - avg_points[7].z);
+    cv::Vec3f bcross;
+    crossproduct(bcross, b1, b2);
+    float bdot = b1.dot(b2);
+    float B = atan2(norm(bcross), bdot);
+
+    // C: 11-12-13
+    cv::Vec3f c1(avg_points[11].x - avg_points[12].x, \
+                 avg_points[11].y - avg_points[12].y, \
+                 avg_points[11].z - avg_points[12].z);
+    cv::Vec3f c2(avg_points[12].x - avg_points[13].x, \
+                 avg_points[12].y - avg_points[13].y, \
+                 avg_points[12].z - avg_points[13].z);
+    cv::Vec3f ccross;
+    crossproduct(ccross, c1, c2);
+    float cdot = c1.dot(c2);
+    float C = atan2(norm(ccross), cdot);
+
+    // D: 4-5-6
+    cv::Vec3f d1(avg_points[4].x - avg_points[5].x, \
+                 avg_points[4].y - avg_points[5].y, \
+                 avg_points[4].z - avg_points[5].z);
+    cv::Vec3f d2(avg_points[5].x - avg_points[6].x, \
+                 avg_points[5].y - avg_points[6].y, \
+                 avg_points[5].z - avg_points[6].z);
+    cv::Vec3f dcross;
+    crossproduct(dcross, d1, d2);
+    float ddot = d1.dot(d2);
+    float D = atan2(norm(dcross), ddot);
+
+    // E: 1-0-22
+    cv::Vec3f e1(avg_points[1].x - avg_points[0].x, \
+                 avg_points[1].y - avg_points[0].y, \
+                 avg_points[1].z - avg_points[0].z);
+    cv::Vec3f e2(avg_points[0].x - avg_points[22].x, \
+                 avg_points[0].y - avg_points[22].y, \
+                 avg_points[0].z - avg_points[22].z);
+    cv::Vec3f ecross;
+    crossproduct(ecross, e1, e2);
+    float edot = e1.dot(e2);
+    float E = atan2(norm(ecross), edot);
+    
+    // F: 1-0-18
+    cv::Vec3f f1(avg_points[1].x - avg_points[0].x, \
+                 avg_points[1].y - avg_points[0].y, \
+                 avg_points[1].z - avg_points[0].z);
+    cv::Vec3f f2(avg_points[0].x - avg_points[18].x, \
+                 avg_points[0].y - avg_points[18].y, \
+                 avg_points[0].z - avg_points[18].z);
+    cv::Vec3f fcross;
+    crossproduct(fcross, f1, f2);
+    float fdot = f1.dot(f2);
+    float F = atan2(norm(fcross), fdot);
+    
+    // G: 0-22-23
+    cv::Vec3f g1(avg_points[0].x - avg_points[22].x, \
+                 avg_points[0].y - avg_points[22].y, \
+                 avg_points[0].z - avg_points[22].z);
+    cv::Vec3f g2(avg_points[22].x - avg_points[23].x, \
+                 avg_points[22].y - avg_points[23].y, \
+                 avg_points[22].z - avg_points[23].z);
+    cv::Vec3f gcross;
+    crossproduct(gcross, g1, g2);
+    float gdot = g1.dot(g2);
+    float G = atan2(norm(gcross), gdot);
+
+    // H: 0-18-19
+    cv::Vec3f h1(avg_points[0].x - avg_points[18].x, \
+                 avg_points[0].y - avg_points[18].y, \
+                 avg_points[0].z - avg_points[18].z);
+    cv::Vec3f h2(avg_points[18].x - avg_points[19].x, \
+                 avg_points[18].y - avg_points[19].y, \
+                 avg_points[18].z - avg_points[19].z);
+    cv::Vec3f hcross;
+    crossproduct(hcross, h1, h2);
+    float hdot = h1.dot(h2);
+    float H = atan2(norm(hcross), hdot);
+
+    // I: 22-23-24
+    cv::Vec3f i1(avg_points[22].x - avg_points[23].x, \
+                 avg_points[22].y - avg_points[23].y, \
+                 avg_points[22].z - avg_points[23].z);
+    cv::Vec3f i2(avg_points[23].x - avg_points[24].x, \
+                 avg_points[23].y - avg_points[24].y, \
+                 avg_points[23].z - avg_points[24].z);
+    cv::Vec3f icross;
+    crossproduct(icross, i1, i2);
+    float idot = i1.dot(i2);
+    float I = atan2(norm(icross), idot);
+
+    // J: 18-19-20
+    cv::Vec3f j1(avg_points[18].x - avg_points[19].x, \
+                 avg_points[18].y - avg_points[19].y, \
+                 avg_points[18].z - avg_points[19].z);
+    cv::Vec3f j2(avg_points[19].x - avg_points[20].x, \
+                 avg_points[19].y - avg_points[20].y, \
+                 avg_points[19].z - avg_points[20].z);
+    cv::Vec3f jcross;
+    crossproduct(jcross, j1, j2);
+    float jdot = j1.dot(j2);
+    float J = atan2(norm(jcross), jdot);
+    
+    // K: 23-24-25
+    cv::Vec3f k1(avg_points[23].x - avg_points[24].x, \
+                 avg_points[23].y - avg_points[24].y, \
+                 avg_points[23].z - avg_points[24].z);
+    cv::Vec3f k2(avg_points[24].x - avg_points[25].x, \
+                 avg_points[24].y - avg_points[25].y, \
+                 avg_points[24].z - avg_points[25].z);
+    cv::Vec3f kcross;
+    crossproduct(kcross, k1, k2);
+    float kdot = k1.dot(k2);
+    float K = atan2(norm(kcross), kdot);
+    
+    // L: 19-20-21
+    cv::Vec3f l1(avg_points[19].x - avg_points[20].x, \
+                 avg_points[19].y - avg_points[20].y, \
+                 avg_points[19].z - avg_points[20].z);
+    cv::Vec3f l2(avg_points[20].x - avg_points[21].x, \
+                 avg_points[20].y - avg_points[21].y, \
+                 avg_points[20].z - avg_points[21].z);
+    cv::Vec3f lcross;
+    crossproduct(lcross, l1, l2);
+    float ldot = l1.dot(l2);
+    float L = atan2(norm(lcross), ldot);
+
+    vector<float> angles = {A,B,C,D,E,F,G,H,I,J,K,L};
+    for (int ii = 0; ii <angles.size(); ++ii)
+    {
+        if (angles[ii] < 0)
+        {
+            angles[ii] += 2*M_PI;
+        }
+        angles[ii] = M_PI - angles[ii];
+    }
+    std::cerr << "finished computing joint angles"<< std::endl;
+    return angles;
+
+}
+
+void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body, cv::Mat& main, cv::Mat& secondary, cv::Matx33f main_intrinsic_matrix)
+{
+    // std::cout << "Main Body ID: " << main_body.id << std::endl;
+    // std::cout << "Secondary Body ID: " << secondary_body.id << std::endl;
+    std::vector<cv::Point> dataMain, dataSecondary, dataAvg;
+
+    // perspective transformation
+    Mat mainstream(3,K4ABT_JOINT_COUNT,CV_32F), secondarystream(3,K4ABT_JOINT_COUNT,CV_32F);
+    std::vector<cv::Point3f> main_points, secondary_points;
+
+    for (int joint=0; joint < (int)K4ABT_JOINT_COUNT; joint++)
+    {
+        // print current positions
+        // std::cout << "main x,y,z: " << main_body.skeleton.joints[joint].position.xyz.x << "\t" << main_body.skeleton.joints[joint].position.xyz.y << "\t" << main_body.skeleton.joints[joint].position.xyz.z << std::endl; 
+        // std::cout << "secondary x,y,z: " << secondary_body.skeleton.joints[joint].position.xyz.x << "\t" << secondary_body.skeleton.joints[joint].position.xyz.y << "\t" << secondary_body.skeleton.joints[joint].position.xyz.z << std::endl; 
+
+        mainstream.at<float>(0,joint) = main_body.skeleton.joints[joint].position.v[0];
+        mainstream.at<float>(1,joint) = main_body.skeleton.joints[joint].position.v[1];
+        mainstream.at<float>(2,joint) = main_body.skeleton.joints[joint].position.v[2];
+        secondarystream.at<float>(0,joint) = secondary_body.skeleton.joints[joint].position.v[0];
+        secondarystream.at<float>(1,joint) = secondary_body.skeleton.joints[joint].position.v[1];
+        secondarystream.at<float>(2,joint) = secondary_body.skeleton.joints[joint].position.v[2];
+
+        main_points.push_back(cv::Point3f(main_body.skeleton.joints[joint].position.v[0],main_body.skeleton.joints[joint].position.v[1],main_body.skeleton.joints[joint].position.v[2]));
+        secondary_points.push_back(cv::Point3d(secondary_body.skeleton.joints[joint].position.v[0],secondary_body.skeleton.joints[joint].position.v[1],secondary_body.skeleton.joints[joint].position.v[2]));
+
+    }
+    
+    // ====Apply transformation====
+    // R, T from secondary to main coordinate space
+    Mat R;
+    Mat T;
+    arun(secondarystream,mainstream, R, T); // R: [3x3], T: [1x3]
+
+    // Matx34f ext_unit;
+    // for (int i = 0; i < 3; ++i)
+    // {
+    //     for (int j = 0; j < 3; ++j)
+    //     {   
+    //         ext_unit(i, j) = R.at<float>(i,j);
+    //     }
+    // }
+    // ext_unit(0,3) = T.at<float>(0,0);
+    // ext_unit(1,3) = T.at<float>(0,1);
+    // ext_unit(2,3) = T.at<float>(0,2);
+    
+    // cout << "intrinsic: "<<main_intrinsic_matrix << endl; // Matx33f
+    // cout << "extrinsic: " << ext_unit << endl;
+    
+    // Mat mult;
+    // mult = Mat(main_intrinsic_matrix) * Mat(ext_unit); // mult: 3x4
+    // Mat newmain, newsecondary;
+    // Mat mainstream_homogeneous(4,K4ABT_JOINT_COUNT,CV_32F),secondarystream_homogeneous(4,K4ABT_JOINT_COUNT,CV_32F); // 4 x num_joint
+    // for (int i=0; i<3; i++)
+    // {
+    //     for (int j=0; j<K4ABT_JOINT_COUNT; j++)
+    //     {
+    //         mainstream_homogeneous.at<float>(i,j) = mainstream.at<float>(i,j);
+    //         secondarystream_homogeneous.at<float>(i,j) = secondarystream.at<float>(i,j);
+    //     }
+    // }
+    // for (int j=0; j<K4ABT_JOINT_COUNT; j++)
+    // {
+    //     mainstream_homogeneous.at<float>(3,j) = 1.;
+    //     secondarystream_homogeneous.at<float>(3,j) = 1.;
+    // }
+    // newmain = mult * mainstream_homogeneous;
+    // newsecondary = mult * secondarystream_homogeneous;
+    
+    // Create zero distortion
+    cv::Mat distCoeffs(4,1,CV_32F);
+    distCoeffs.at<float>(0) = 0;
+    distCoeffs.at<float>(1) = 0;
+    distCoeffs.at<float>(2) = 0;
+    distCoeffs.at<float>(3) = 0;
+    std::vector<cv::Point2f> projectedPointsMain, projectedPointsSecondary;
+    cv::Mat rvecR(3,1,cv::DataType<double>::type);//rodrigues rotation matrix
+    cv::Rodrigues(R,rvecR);
+    cv::projectPoints(main_points, rvecR, T, Mat(main_intrinsic_matrix), distCoeffs, projectedPointsMain);
+    cv::projectPoints(secondary_points, rvecR, T, Mat(main_intrinsic_matrix), distCoeffs, projectedPointsSecondary);
+
+    std::vector<cv::Point3f> avg_points;
+
     for (int i = 0; i < (int)K4ABT_JOINT_COUNT; i++)
     {
         k4a_float3_t main_position = main_body.skeleton.joints[i].position;
@@ -802,143 +1077,291 @@ void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body,
         if (main_or_secondary == 0) { avgCI = main_confidence_level; }
         else if (main_or_secondary == 1) { avgCI = secondary_confidence_level; }
         else { avgCI = main_confidence_level; }
+
+        avg_points.push_back(cv::Point3f(avgPos.v[0],avgPos.v[1], avgPos.v[2]));
+    }
+
+    // compute joint angles
+    vector<float> joint_angles = computeJointAngles(avg_points);
+    int offset = 0;
+    int index = 0;
+    string angle;
+    ofstream outfile_angles;
+    outfile_angles.open("../saved_data/joints_sync_angles.csv", ios::out|ios::app);
+    outfile_angles << to_string(ANGLE_FRAME_ROW_COUNT) << ",";
+    for(std::vector<float>::iterator it = joint_angles.begin(); it != joint_angles.end(); it++)
+    {
+        outfile_angles << *it*180/M_PI << ",";
+        angle = (char)(index+65);
+        cv::putText(main, angle+": "+to_string(*it*180/M_PI), cv::Point(main.cols-200, 30+offset), FONT_HERSHEY_DUPLEX, 1, COLORS_darkorange, 1);
+        offset += 30;
+        index++;
+    }
+    ANGLE_FRAME_ROW_COUNT++;
+    outfile_angles << std::endl;
+    outfile_angles.close();
+
+    std::vector<cv::Point2f> projectedPointsAvg;
+    cv::projectPoints(avg_points, rvecR, T, Mat(main_intrinsic_matrix), distCoeffs, projectedPointsAvg);
+
+    for (int i = 0; i < (int)K4ABT_JOINT_COUNT; i++)
+    {
         // printf("[Synced] Joint[%d]: Position[mm] ( %f, %f, %f ); Orientation ( %f, %f, %f, %f); Confidence Level (%d)  \n", i, avgPos.v[0], avgPos.v[1], avgPos.v[2], main_orientation.v[0], avgQuaternion.v[1], avgQuaternion.v[2], avgQuaternion.v[3], avgCI);
 
-
         // ============ Display both joint streams in one RGB image ==========
+        int offsetx = 0;
+        int offsety = 40;
         // plot 2D points for main camera
-        int radius = 10;
-        cv::Point center1 = cv::Point(main_position.xyz.x, main_position.xyz.y);
+        int radius = 3;
+        // cv::Point center1 = cv::Point(main_position.xyz.x, main_position.xyz.y);
+        cv::Point center1 = projectedPointsMain[i];
+        center1 = cv::Point(center1.x+offsetx, center1.y+offsety);
         dataMain.push_back(center1);
-        // if (prevPt1 == cv::Point(0,0))
-        // {
-        //     prevPt1 = center1;
-        // }
         cv::Scalar color = COLORS_red;
-        circle(main, center1, radius, color, CV_FILLED);
-        putText(main, to_string(i), center1, FONT_HERSHEY_DUPLEX, 1, Scalar(0,143,143), 2);
-        // line( main, prevPt1, center1, Scalar( 110, 220, 0 ),  thickness, 8 );
-        // prevPt1 = center1;
+        cv::circle(main, center1, radius, color, CV_FILLED);
+        cv::putText(main, to_string(i), center1, FONT_HERSHEY_DUPLEX, 1, Scalar(0,143,143), 2);
         cv::namedWindow("cv_main_color_image", CV_WINDOW_AUTOSIZE);
         cv::imshow("cv_main_color_image", main);
         cv::waitKey(1);
 
         // plot 2D points for subordinate camera - 1
-        radius = 5;
-        cv::Point center2 = cv::Point(main_position.xyz.x, main_position.xyz.y);
+        radius = 3;
+        // cv::Point center2 = cv::Point(secondary_position.xyz.x, secondary_position.xyz.y);
+        cv::Point center2 = projectedPointsSecondary[i];
+        center2 = cv::Point(center2.x+offsetx, center2.y+offsety);
         dataSecondary.push_back(center2);
-        // if (prevPt2 == cv::Point(0,0))
-        // {
-        //     prevPt2 = center2;
-        // }
         color =  COLORS_blue;
-        circle(secondary, center2, radius, color, CV_FILLED);
-        putText(secondary, to_string(i), center2, FONT_HERSHEY_DUPLEX, 1, Scalar(0,143,143), 2);
-        // line( secondary, prevPt2, center2, Scalar( 110, 220, 0 ),  thickness, 8 );
-        // prevPt2 = center2;
-
+        cv::circle(secondary, center2, radius, color, CV_FILLED);
+        cv::putText(secondary, to_string(i), center2, FONT_HERSHEY_DUPLEX, 1, Scalar(0,143,143), 2);
+        
         cv::namedWindow("cv_secondary_color_image", CV_WINDOW_AUTOSIZE);
         cv::imshow("cv_secondary_color_image", secondary);
         cv::waitKey(1);
 
-        if (outfile.is_open())
-        {
-            outfile << main_body.id << "," << i << "," << avgPos.v[0] << "," << avgPos.v[1] << "," << avgPos.v[2] << "," << avgQuaternion.v[0] << "," << avgQuaternion.v[1] << "," << avgQuaternion.v[2] << "," << avgQuaternion.v[3] << "," << confidenceEnumMapping(avgCI) << "," << endl;
-        }
+        // plot 2D points for averaged
+        radius = 10;
+        cv::Point center0 = projectedPointsAvg[i];
+        center0 = cv::Point(center0.x+offsetx, center0.y+offsety);
+        dataAvg.push_back(center0);
+        color = COLORS_green;
+        cv::circle(main, center0, radius, color, CV_FILLED);
+        cv::putText(main, to_string(i), center0, FONT_HERSHEY_DUPLEX, 1, Scalar(0,143,143), 2);
+        cv::namedWindow("cv_main_color_image", CV_WINDOW_AUTOSIZE);
+        cv::imshow("cv_main_color_image", main);
+        cv::waitKey(1);
     }
-    plotBody(dataMain, dataSecondary, main, secondary);
+    plotBody(dataMain, dataSecondary, dataAvg, main, secondary);
+
 }
 
-
-void plotBody(std::vector<cv::Point> dataMain, std::vector<cv::Point> dataSecondary, cv::Mat main, cv::Mat secondary)
+void plotBody(std::vector<cv::Point> dataMain, std::vector<cv::Point> dataSecondary, std::vector<cv::Point> dataAvg, cv::Mat main, cv::Mat secondary)
 {
-    cv::Scalar color; // green
+    // draws lines between joints for both main and secondary streams
+    cv::Scalar color;
     int counter = 0, thickness = 0;
-    std::list<std::vector<cv::Point>> datalist {dataMain, dataSecondary};
+    std::list<std::vector<cv::Point>> datalist {dataMain, dataSecondary, dataAvg};
     std::vector<cv::Mat> imgList {main, secondary};
     for (auto stream : datalist)
     {
         switch (counter)
         {
-            case 0:
+            case 0: // main
                 color = COLORS_red;
-                thickness = 10;
+                thickness = 3;
                 break;
-            case 1:
+            case 1: // secondary
                 color = COLORS_blue;
                 thickness = 3;
                 break;
+            case 2:  // avg
+                color = COLORS_green;
+                thickness = 10;
+                break;
         }
         // [child]: child joint to parent joint
+        // imgList: main, secondary views
+        // stream: joint positions
+
         // 1: spine naval to pelvis
-        line(imgList.at(0), stream[1], stream[0], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[1], stream[0], color,  thickness, 8 ); // 8: cv::line
         // 2: spine chest to spine naval
-        line(imgList.at(0), stream[2], stream[1], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[2], stream[1], color,  thickness, 8 );
         // 3: neck to spine chest
-        line(imgList.at(0), stream[3], stream[2], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[3], stream[2], color,  thickness, 8 );
         // 4: clavicle left to spine chest
-        line(imgList.at(0), stream[4], stream[2], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[4], stream[2], color,  thickness, 8 );
         // 5: shoulder left to clavicle left
-        line(imgList.at(0), stream[5], stream[4], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[5], stream[4], color,  thickness, 8 );
         // 6: elbow left to shoulder left
-        line(imgList.at(0), stream[6], stream[5], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[6], stream[5], color,  thickness, 8 );
         // 7: wrist left to elbow left
-        line(imgList.at(0), stream[7], stream[6], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[7], stream[6], color,  thickness, 8 );
         // 8: hand left to wrist left
-        line(imgList.at(0), stream[8], stream[7], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[8], stream[7], color,  thickness, 8 );
         // 9: handtip left to hand left
-        line(imgList.at(0), stream[9], stream[8], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[9], stream[8], color,  thickness, 8 );
         // 10: thumb left to writst left
-        line(imgList.at(0), stream[10], stream[7], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[10], stream[7], color,  thickness, 8 );
         // 11: clavicle right to spine chest
-        line(imgList.at(0), stream[11], stream[2], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[11], stream[2], color,  thickness, 8 );
         // 12: shoulder right to clavicle right
-        line(imgList.at(0), stream[12], stream[11], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[12], stream[11], color,  thickness, 8 );
         // 13: elbow rith to shoulder right
-        line(imgList.at(0), stream[13], stream[12], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[13], stream[12], color,  thickness, 8 );
         // 14: wrist right to elbow right
-        line(imgList.at(0), stream[14], stream[13], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[14], stream[13], color,  thickness, 8 );
         // 15: hand right to wrist right
-        line(imgList.at(0), stream[15], stream[14], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[15], stream[14], color,  thickness, 8 );
         // 16: handtip right to hand right
-        line(imgList.at(0), stream[16], stream[15], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[16], stream[15], color,  thickness, 8 );
         // 17: thumb right to writst right
-        line(imgList.at(0), stream[17], stream[14], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[17], stream[14], color,  thickness, 8 );
         // 18: hip left to pelvis
-        line(imgList.at(0), stream[18], stream[0], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[18], stream[0], color,  thickness, 8 );
         // 19: knee left to hip left
-        line(imgList.at(0), stream[19], stream[18], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[19], stream[18], color,  thickness, 8 );
         // 20: ankle left to knee left
-        line(imgList.at(0), stream[20], stream[19], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[20], stream[19], color,  thickness, 8 );
         // 21: foot left to ankle left
-        line(imgList.at(0), stream[21], stream[20], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[21], stream[20], color,  thickness, 8 );
         // 22: hip right to plevis
-        line(imgList.at(0), stream[22], stream[0], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[22], stream[0], color,  thickness, 8 );
         // 23: knee right to hip right
-        line(imgList.at(0), stream[23], stream[22], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[23], stream[22], color,  thickness, 8 );
         // 24: ankle right to hip right
-        line(imgList.at(0), stream[24], stream[22], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[24], stream[22], color,  thickness, 8 );
         // 25: foot right to ankle right
-        line(imgList.at(0), stream[25], stream[24], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[25], stream[24], color,  thickness, 8 );
         // 26: head to neck
-        line(imgList.at(0), stream[26], stream[3], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[26], stream[3], color,  thickness, 8 );
         // 27: nose to head
-        line(imgList.at(0), stream[27], stream[26], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[27], stream[26], color,  thickness, 8 );
         // 28: eye left to head
-        line(imgList.at(0), stream[28], stream[26], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[28], stream[26], color,  thickness, 8 );
         // 29: ear left to head
-        line(imgList.at(0), stream[29], stream[26], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[29], stream[26], color,  thickness, 8 );
         // 30: eye right to head
-        line(imgList.at(0), stream[30], stream[26], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[30], stream[26], color,  thickness, 8 );
         // 31: ear right to head
-        line(imgList.at(0), stream[31], stream[26], color,  thickness, 8 );
+        cv::line(imgList.at(0), stream[31], stream[26], color,  thickness, 8 );
         counter += 1;
     }
-    cv::namedWindow("MAIN", CV_WINDOW_AUTOSIZE);
-    cv::imshow("MAIN", imgList.at(0));
+    cv::namedWindow("main color camera", CV_WINDOW_AUTOSIZE);
+    cv::putText(imgList.at(0), "[device 1] red", cv::Point(30, 30), CV_FONT_HERSHEY_PLAIN, 1.5, COLORS_red, 2, 8, false);
+    cv::putText(imgList.at(0), "[device 2] blue", cv::Point(30, 70), CV_FONT_HERSHEY_PLAIN, 1.5, COLORS_blue, 2, 8, false);
+    cv::putText(imgList.at(0), "[2 in sync] green", cv::Point(30, 110), CV_FONT_HERSHEY_PLAIN, 1.5, COLORS_green, 2, 8, false);
+    cv::imshow("main color camera", imgList.at(0));
     cv::waitKey(1);
 }
 
+void transform_body(k4abt_body_t& main_body, k4abt_body_t& secondary_body)
+{
+    // called per frame, for data stream containing body objects with 32 positions, orientations
+    // transform secondary to main body space coordinates
+    // using Arun's method for computing Rotation and Translation Matrices from positions (for 3dof) / orientations (for 6dof)
+    
+    // for each joint object
+    // k4a_float3_t main_position, secondary_position;
+    // k4a_quaternion_t main_quaternion, secondary_quaternion;
+    
+    // main, secondary: [3 x #_joints]
+    Mat main(3,K4ABT_JOINT_COUNT,CV_32F), secondary(3,K4ABT_JOINT_COUNT,CV_32F);
+    for (int joint=0; joint < (int)K4ABT_JOINT_COUNT; joint++)
+    {
+        // print current positions
+        // std::cout << "main x,y,z: " << main_body.skeleton.joints[joint].position.xyz.x << "\t" << main_body.skeleton.joints[joint].position.xyz.y << "\t" << main_body.skeleton.joints[joint].position.xyz.z << std::endl; 
+        // std::cout << "secondary x,y,z: " << secondary_body.skeleton.joints[joint].position.xyz.x << "\t" << secondary_body.skeleton.joints[joint].position.xyz.y << "\t" << secondary_body.skeleton.joints[joint].position.xyz.z << std::endl; 
+
+        main.at<float>(0,joint) = main_body.skeleton.joints[joint].position.v[0];
+        main.at<float>(1,joint) = main_body.skeleton.joints[joint].position.v[1];
+        main.at<float>(2,joint) = main_body.skeleton.joints[joint].position.v[2];
+        secondary.at<float>(0,joint) = secondary_body.skeleton.joints[joint].position.v[0];
+        secondary.at<float>(1,joint) = secondary_body.skeleton.joints[joint].position.v[1];
+        secondary.at<float>(2,joint) = secondary_body.skeleton.joints[joint].position.v[2];
+    }
+    
+    // ====Apply transformation====
+    // R, T from secondary to main coordinate space
+    Mat R, T;
+    arun(secondary,main, R, T); // R: [3x3], T: [1x3]
+    
+    // main, secondary: [3 x 32]
+    Mat T_rep;
+    cv::repeat(T, 1, K4ABT_JOINT_COUNT, T_rep); // T_rep: [3x32]
+    
+    Mat secondary_tf;
+    cv::add(R*secondary, T_rep, secondary_tf);
+
+    // std::cout << "================TRANSFORMED=================" << endl;  
+    // std::cout << "main: " << main << endl;  
+    // std::cout << endl << "secondary_tf: " << secondary_tf << endl;
+
+    // reassign body object with transformed positions
+    for (int joint=0; joint < (int)K4ABT_JOINT_COUNT; joint++)
+    {
+        // std::cout << "putting back in..." << endl; 
+        // std::cout << secondary_tf.at<float>(0,joint) << " / ";
+        // std::cout << secondary_tf.at<float>(1,joint) << " / ";
+        // std::cout << secondary_tf.at<float>(2,joint) << " / " << endl;
+
+        secondary_body.skeleton.joints[joint].position.v[0] = secondary_tf.at<float>(0,joint);
+        secondary_body.skeleton.joints[joint].position.v[1] = secondary_tf.at<float>(1,joint);
+        secondary_body.skeleton.joints[joint].position.v[2] = secondary_tf.at<float>(2,joint);
+    }
+}
+
+void arun(Mat& streamfrom, Mat& streamto, Mat& R, Mat& T)
+{
+    // ======Arun's method START======
+    // find mean across the row (all joints for each x,y,z)
+    Mat avg_streamfrom, avg_streamto;                        // main, secondary: [3x32]
+    reduce(streamfrom, avg_streamfrom, 1, CV_REDUCE_AVG);           // avg_main: [3x1]
+    reduce(streamto, avg_streamto, 1, CV_REDUCE_AVG); 
+
+    // find deviations from the mean
+    Mat rep_avg_streamfrom, rep_avg_streamto;
+    cv::repeat(avg_streamfrom, 1, K4ABT_JOINT_COUNT, rep_avg_streamfrom);      // rep_avg_main: [3x32]
+    cv::repeat(avg_streamto, 1, K4ABT_JOINT_COUNT, rep_avg_streamto);
+
+    Mat streamfrom_sub, streamto_sub;
+    subtract(streamfrom, rep_avg_streamfrom, streamfrom_sub);
+    subtract(streamto, rep_avg_streamto, streamto_sub);
+
+    // take singular value decomposition and compute R and T matrices
+    Mat s, u, v;
+    // cv::SVD::compute(secondary_sub * main_sub.t(), s, u, v);
+    cv::SVDecomp(streamfrom_sub * streamto_sub.t(), s, u, v);
+    v = v.t();
+    R = v * u.t();
+    double det = cv::determinant(R);
+    
+    // std::cout << "determinant: "<<det<<std::endl;
+    if (det >= 0)
+    {
+        // T = avg_main - (R * avg_secondary); // T: [3x1]
+        subtract(avg_streamto, (R*avg_streamfrom), T);
+        // std::cout << "================ORIGINAL=================" << endl;    
+        // std::cout << "main: " << streamto << endl;
+        // std::cout << endl << "secondary: " << streamfrom << endl;
+
+        // std::cout << "================MEAN=================" << endl;
+        // std::cout << "avg_main: " << avg_streamto << endl;
+        // std::cout << endl << "avg_secondary: " << avg_streamfrom << endl;
+
+        // std::cout << "=================SVD===================" << endl;
+        // std::cout << "input: " << streamfrom_sub * streamto_sub.t() << endl;
+        // std::cout << endl << "u: " << u << endl;
+        // std::cout << endl << "s: " << s << endl;
+        // std::cout << endl << "v: " << v << endl;
+    } else {
+        T = Mat(1,3,CV_32F,Scalar(1,1,1));
+    }
+    // ======Arun's method END======
+
+    // R: [3x3], T: [3x1]
+    // std::cout << endl << "R "<<R.size()<<" : \n" << R << "\nT "<<T.size()<<" :\n" << T << std::endl;
+    
+}
 void print_body_index_map_middle_line(k4a::image body_index_map)
 {
     uint8_t* body_index_map_buffer = body_index_map.get_buffer();
@@ -952,15 +1375,14 @@ void print_body_index_map_middle_line(k4a::image body_index_map)
     int middle_line_num = body_index_map.get_height_pixels() / 2;
     body_index_map_buffer = body_index_map_buffer + middle_line_num * body_index_map.get_width_pixels();
 
-    std::cout << "BodyIndexMap at Line " << middle_line_num << ":" << std::endl;
+     std::cout << "BodyIndexMap at Line " << middle_line_num << ":" << std::endl;
     for (int i = 0; i < body_index_map.get_width_pixels(); i++)
     {
-        std::cout << (int)*body_index_map_buffer << ", ";
+         std::cout << (int)*body_index_map_buffer << ", ";
         body_index_map_buffer++;
     }
-    std::cout << std::endl;
+     std::cout << std::endl;
 }
-// ================ END body tracking functions
 
 k4a_float3_t get_average_position_xyz(k4a_float3_t main_position, k4a_float3_t secondary_position, int main_or_secondary)
 {

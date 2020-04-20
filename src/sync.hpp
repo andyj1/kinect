@@ -51,10 +51,11 @@ class sync{
         int get_average_confidence(k4abt_joint_confidence_level_t mainCI, k4abt_joint_confidence_level_t secondaryCI);
         string confidenceEnumMapping(k4abt_joint_confidence_level_t confidence_level);
 
-        void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body, cv::Mat& main, cv::Mat& secondary, cv::Matx33f main_intrinsic_matrix);
-        void plotBody(std::vector<cv::Point> dataMain, std::vector<cv::Point> dataSecondary, std::vector<cv::Point> dataAvg, cv::Mat main, cv::Mat secondary);
+        void print_body_information(k4abt_body_t main_body, vector<vector<k4abt_body_t>> secondary_body_vector, cv::Mat &main, cv::Matx33f main_intrinsic_matrix, int num_subordinates);
         void transform_body(k4abt_body_t& main_body, k4abt_body_t& secondary_body);
         void arun(Mat& main, Mat& secondary, Mat& R, Mat& T);
+        void plotBody(k4abt_body_t main_body, k4abt_body_t avg_body, cv::Mat main, cv::Matx33f main_intrinsic_matrix);
+        std::vector<float> computeJointAngles(k4abt_body_t avg_body);
 
     private:
 
