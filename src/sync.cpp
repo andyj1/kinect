@@ -1065,167 +1065,160 @@ void print_body_information(k4abt_body_t main_body, vector<vector<k4abt_body_t>>
     
 }
 
-void crossproduct (cv::Vec3f &ans, cv::Vec3f &p1, cv::Vec3f &p2)
+void getJointAngle(float &ans, cv::Vec3f &p1, cv::Vec3f &p2)
 {
-    ans[0] = p1[1]*p2[2] -p1[2]*p2[1];
-    ans[1] = p1[0]*p2[2] -p1[2]*p2[0];
-    ans[2] = p1[0]*p2[1] -p1[1]*p2[0];
+    cv::Vec3f fcross;
+    fcross[0] = p1[1]*p2[2] - p1[2]*p2[1];
+    fcross[1] = p1[2]*p2[0] - p1[0]*p2[2];
+    fcross[2] = p1[0]*p2[1] - p1[1]*p2[0];
+    // take norm of cross product: sqrt(fcrossx * fcrossx + fcrossy * fcrossy + fcrossz * fcrossz);
+    float fcross_norm = norm(fcross);
+    // take dot product: p1[0] * p2[0] + p1[1] * p2[1] + p1[2] * p2[2];
+    float fdot = p1.dot(p2);
+    ans = atan2(fcross_norm, fdot);
 }
 std::vector<float> computeJointAngles(k4abt_body_t avg_body)
 {
     // plot angles from 3D positions
     // A: 12-13-14
-    cv::Vec3f a1(avg_body.skeleton.joints[12].position.v[0] - avg_body.skeleton.joints[13].position.v[0], \
-                 avg_body.skeleton.joints[12].position.v[1] - avg_body.skeleton.joints[13].position.v[1], \
-                 avg_body.skeleton.joints[12].position.v[2] - avg_body.skeleton.joints[13].position.v[2]);
+    cv::Vec3f a1(avg_body.skeleton.joints[13].position.v[0] - avg_body.skeleton.joints[12].position.v[0], \
+                 avg_body.skeleton.joints[13].position.v[1] - avg_body.skeleton.joints[12].position.v[1], \
+                 avg_body.skeleton.joints[13].position.v[2] - avg_body.skeleton.joints[12].position.v[2]);
     cv::Vec3f a2(avg_body.skeleton.joints[13].position.v[0] - avg_body.skeleton.joints[14].position.v[0], \
                  avg_body.skeleton.joints[13].position.v[1] - avg_body.skeleton.joints[14].position.v[1], \
                  avg_body.skeleton.joints[13].position.v[2] - avg_body.skeleton.joints[14].position.v[2]);
-    cv::Vec3f across;
-    crossproduct(across, a1, a2);
-    float adot = a1.dot(a2);
-    float A = atan2(norm(across), adot);
+    
+    float A;
+    getJointAngle(A, a1, a2);
 
     // B: 5-6-7
-    cv::Vec3f b1(avg_body.skeleton.joints[5].position.v[0] - avg_body.skeleton.joints[6].position.v[0], \
-                 avg_body.skeleton.joints[5].position.v[1] - avg_body.skeleton.joints[6].position.v[1], \
-                 avg_body.skeleton.joints[5].position.v[2] - avg_body.skeleton.joints[6].position.v[2]);
+    cv::Vec3f b1(avg_body.skeleton.joints[6].position.v[0] - avg_body.skeleton.joints[5].position.v[0], \
+                 avg_body.skeleton.joints[6].position.v[1] - avg_body.skeleton.joints[5].position.v[1], \
+                 avg_body.skeleton.joints[6].position.v[2] - avg_body.skeleton.joints[5].position.v[2]);
     cv::Vec3f b2(avg_body.skeleton.joints[6].position.v[0] - avg_body.skeleton.joints[7].position.v[0], \
                  avg_body.skeleton.joints[6].position.v[1] - avg_body.skeleton.joints[7].position.v[1], \
                  avg_body.skeleton.joints[6].position.v[2] - avg_body.skeleton.joints[7].position.v[2]);
-    cv::Vec3f bcross;
-    crossproduct(bcross, b1, b2);
-    float bdot = b1.dot(b2);
-    float B = atan2(norm(bcross), bdot);
+    
+    float B;
+    getJointAngle(B, b1, b2);
 
     // C: 11-12-13
-    cv::Vec3f c1(avg_body.skeleton.joints[11].position.v[0] - avg_body.skeleton.joints[12].position.v[0], \
-                 avg_body.skeleton.joints[11].position.v[1] - avg_body.skeleton.joints[12].position.v[1], \
-                 avg_body.skeleton.joints[11].position.v[2] - avg_body.skeleton.joints[12].position.v[2]);
+    cv::Vec3f c1(avg_body.skeleton.joints[12].position.v[0] - avg_body.skeleton.joints[11].position.v[0], \
+                 avg_body.skeleton.joints[12].position.v[1] - avg_body.skeleton.joints[11].position.v[1], \
+                 avg_body.skeleton.joints[12].position.v[2] - avg_body.skeleton.joints[11].position.v[2]);
     cv::Vec3f c2(avg_body.skeleton.joints[12].position.v[0] - avg_body.skeleton.joints[13].position.v[0], \
                  avg_body.skeleton.joints[12].position.v[1] - avg_body.skeleton.joints[13].position.v[1], \
                  avg_body.skeleton.joints[12].position.v[2] - avg_body.skeleton.joints[13].position.v[2]);
-    cv::Vec3f ccross;
-    crossproduct(ccross, c1, c2);
-    float cdot = c1.dot(c2);
-    float C = atan2(norm(ccross), cdot);
+    
+    float C;
+    getJointAngle(C, c1, c2);
 
     // D: 4-5-6
-    cv::Vec3f d1(avg_body.skeleton.joints[4].position.v[0] - avg_body.skeleton.joints[5].position.v[0], \
-                 avg_body.skeleton.joints[4].position.v[1] - avg_body.skeleton.joints[5].position.v[1], \
-                 avg_body.skeleton.joints[4].position.v[2] - avg_body.skeleton.joints[5].position.v[2]);
+    cv::Vec3f d1(avg_body.skeleton.joints[5].position.v[0] - avg_body.skeleton.joints[4].position.v[0], \
+                 avg_body.skeleton.joints[5].position.v[1] - avg_body.skeleton.joints[4].position.v[1], \
+                 avg_body.skeleton.joints[5].position.v[2] - avg_body.skeleton.joints[4].position.v[2]);
     cv::Vec3f d2(avg_body.skeleton.joints[5].position.v[0] - avg_body.skeleton.joints[6].position.v[0], \
                  avg_body.skeleton.joints[5].position.v[1] - avg_body.skeleton.joints[6].position.v[1], \
                  avg_body.skeleton.joints[5].position.v[2] - avg_body.skeleton.joints[6].position.v[2]);
-    cv::Vec3f dcross;
-    crossproduct(dcross, d1, d2);
-    float ddot = d1.dot(d2);
-    float D = atan2(norm(dcross), ddot);
+    
+    float D;
+    getJointAngle(D, d1, d2);
 
     // E: 1-0-22
-    cv::Vec3f e1(avg_body.skeleton.joints[1].position.v[0] - avg_body.skeleton.joints[0].position.v[0], \
-                 avg_body.skeleton.joints[1].position.v[1] - avg_body.skeleton.joints[0].position.v[1], \
-                 avg_body.skeleton.joints[1].position.v[2] - avg_body.skeleton.joints[0].position.v[2]);
+    cv::Vec3f e1(avg_body.skeleton.joints[0].position.v[0] - avg_body.skeleton.joints[1].position.v[0], \
+                 avg_body.skeleton.joints[0].position.v[1] - avg_body.skeleton.joints[1].position.v[1], \
+                 avg_body.skeleton.joints[0].position.v[2] - avg_body.skeleton.joints[1].position.v[2]);
     cv::Vec3f e2(avg_body.skeleton.joints[0].position.v[0] - avg_body.skeleton.joints[22].position.v[0], \
                  avg_body.skeleton.joints[0].position.v[1] - avg_body.skeleton.joints[22].position.v[1], \
                  avg_body.skeleton.joints[0].position.v[2] - avg_body.skeleton.joints[22].position.v[2]);
-    cv::Vec3f ecross;
-    crossproduct(ecross, e1, e2);
-    float edot = e1.dot(e2);
-    float E = atan2(norm(ecross), edot);
     
+    float E;
+    getJointAngle(E, e1, e2);
+
     // F: 1-0-18
-    cv::Vec3f f1(avg_body.skeleton.joints[1].position.v[0] - avg_body.skeleton.joints[0].position.v[0], \
-                 avg_body.skeleton.joints[1].position.v[1] - avg_body.skeleton.joints[0].position.v[1], \
-                 avg_body.skeleton.joints[1].position.v[2] - avg_body.skeleton.joints[0].position.v[2]);
+    cv::Vec3f f1(avg_body.skeleton.joints[0].position.v[0] - avg_body.skeleton.joints[1].position.v[0], \
+                 avg_body.skeleton.joints[0].position.v[1] - avg_body.skeleton.joints[1].position.v[1], \
+                 avg_body.skeleton.joints[0].position.v[2] - avg_body.skeleton.joints[1].position.v[2]);
     cv::Vec3f f2(avg_body.skeleton.joints[0].position.v[0] - avg_body.skeleton.joints[18].position.v[0], \
                  avg_body.skeleton.joints[0].position.v[1] - avg_body.skeleton.joints[18].position.v[1], \
                  avg_body.skeleton.joints[0].position.v[2] - avg_body.skeleton.joints[18].position.v[2]);
-    cv::Vec3f fcross;
-    crossproduct(fcross, f1, f2);
-    float fdot = f1.dot(f2);
-    float F = atan2(norm(fcross), fdot);
     
+    float F;
+    getJointAngle(F, f1, f2);
+
     // G: 0-22-23
-    cv::Vec3f g1(avg_body.skeleton.joints[0].position.v[0] - avg_body.skeleton.joints[22].position.v[0], \
-                 avg_body.skeleton.joints[0].position.v[1] - avg_body.skeleton.joints[22].position.v[1], \
-                 avg_body.skeleton.joints[0].position.v[2] - avg_body.skeleton.joints[22].position.v[2]);
+    cv::Vec3f g1(avg_body.skeleton.joints[22].position.v[0] - avg_body.skeleton.joints[0].position.v[0], \
+                 avg_body.skeleton.joints[22].position.v[1] - avg_body.skeleton.joints[0].position.v[1], \
+                 avg_body.skeleton.joints[22].position.v[2] - avg_body.skeleton.joints[0].position.v[2]);
     cv::Vec3f g2(avg_body.skeleton.joints[22].position.v[0] - avg_body.skeleton.joints[23].position.v[0], \
                  avg_body.skeleton.joints[22].position.v[1] - avg_body.skeleton.joints[23].position.v[1], \
                  avg_body.skeleton.joints[22].position.v[2] - avg_body.skeleton.joints[23].position.v[2]);
-    cv::Vec3f gcross;
-    crossproduct(gcross, g1, g2);
-    float gdot = g1.dot(g2);
-    float G = atan2(norm(gcross), gdot);
+    
+    float G;
+    getJointAngle(G, g1, g2);
 
     // H: 0-18-19
-    cv::Vec3f h1(avg_body.skeleton.joints[0].position.v[0] - avg_body.skeleton.joints[18].position.v[0], \
-                 avg_body.skeleton.joints[0].position.v[1] - avg_body.skeleton.joints[18].position.v[1], \
-                 avg_body.skeleton.joints[0].position.v[2] - avg_body.skeleton.joints[18].position.v[2]);
+    cv::Vec3f h1(avg_body.skeleton.joints[18].position.v[0] - avg_body.skeleton.joints[0].position.v[0], \
+                 avg_body.skeleton.joints[18].position.v[1] - avg_body.skeleton.joints[0].position.v[1], \
+                 avg_body.skeleton.joints[18].position.v[2] - avg_body.skeleton.joints[0].position.v[2]);
     cv::Vec3f h2(avg_body.skeleton.joints[18].position.v[0] - avg_body.skeleton.joints[19].position.v[0], \
                  avg_body.skeleton.joints[18].position.v[1] - avg_body.skeleton.joints[19].position.v[1], \
                  avg_body.skeleton.joints[18].position.v[2] - avg_body.skeleton.joints[19].position.v[2]);
-    cv::Vec3f hcross;
-    crossproduct(hcross, h1, h2);
-    float hdot = h1.dot(h2);
-    float H = atan2(norm(hcross), hdot);
+
+    float H;
+    getJointAngle(H, h1, h2);
 
     // I: 22-23-24
-    cv::Vec3f i1(avg_body.skeleton.joints[22].position.v[0] - avg_body.skeleton.joints[23].position.v[0], \
-                 avg_body.skeleton.joints[22].position.v[1] - avg_body.skeleton.joints[23].position.v[1], \
-                 avg_body.skeleton.joints[22].position.v[2] - avg_body.skeleton.joints[23].position.v[2]);
+    cv::Vec3f i1(avg_body.skeleton.joints[23].position.v[0] - avg_body.skeleton.joints[22].position.v[0], \
+                 avg_body.skeleton.joints[23].position.v[1] - avg_body.skeleton.joints[22].position.v[1], \
+                 avg_body.skeleton.joints[23].position.v[2] - avg_body.skeleton.joints[22].position.v[2]);
     cv::Vec3f i2(avg_body.skeleton.joints[23].position.v[0] - avg_body.skeleton.joints[24].position.v[0], \
                  avg_body.skeleton.joints[23].position.v[1] - avg_body.skeleton.joints[24].position.v[1], \
                  avg_body.skeleton.joints[23].position.v[2] - avg_body.skeleton.joints[24].position.v[2]);
-    cv::Vec3f icross;
-    crossproduct(icross, i1, i2);
-    float idot = i1.dot(i2);
-    float I = atan2(norm(icross), idot);
+    
+    float I;
+    getJointAngle(I, i1, i2);
 
     // J: 18-19-20
-    cv::Vec3f j1(avg_body.skeleton.joints[18].position.v[0] - avg_body.skeleton.joints[19].position.v[0], \
-                 avg_body.skeleton.joints[18].position.v[1] - avg_body.skeleton.joints[19].position.v[1], \
-                 avg_body.skeleton.joints[18].position.v[2] - avg_body.skeleton.joints[19].position.v[2]);
+    cv::Vec3f j1(avg_body.skeleton.joints[19].position.v[0] - avg_body.skeleton.joints[18].position.v[0], \
+                 avg_body.skeleton.joints[19].position.v[1] - avg_body.skeleton.joints[18].position.v[1], \
+                 avg_body.skeleton.joints[19].position.v[2] - avg_body.skeleton.joints[18].position.v[2]);
     cv::Vec3f j2(avg_body.skeleton.joints[19].position.v[0] - avg_body.skeleton.joints[20].position.v[0], \
                  avg_body.skeleton.joints[19].position.v[1] - avg_body.skeleton.joints[20].position.v[1], \
                  avg_body.skeleton.joints[19].position.v[2] - avg_body.skeleton.joints[20].position.v[2]);
-    cv::Vec3f jcross;
-    crossproduct(jcross, j1, j2);
-    float jdot = j1.dot(j2);
-    float J = atan2(norm(jcross), jdot);
+    
+    float J;
+    getJointAngle(J, j1, j2);
+
     
     // K: 23-24-25
-    cv::Vec3f k1(avg_body.skeleton.joints[23].position.v[0] - avg_body.skeleton.joints[24].position.v[0], \
-                 avg_body.skeleton.joints[23].position.v[1] - avg_body.skeleton.joints[24].position.v[1], \
-                 avg_body.skeleton.joints[23].position.v[2] - avg_body.skeleton.joints[24].position.v[2]);
+    cv::Vec3f k1(avg_body.skeleton.joints[24].position.v[0] - avg_body.skeleton.joints[23].position.v[0], \
+                 avg_body.skeleton.joints[24].position.v[1] - avg_body.skeleton.joints[23].position.v[1], \
+                 avg_body.skeleton.joints[24].position.v[2] - avg_body.skeleton.joints[23].position.v[2]);
     cv::Vec3f k2(avg_body.skeleton.joints[24].position.v[0] - avg_body.skeleton.joints[25].position.v[0], \
                  avg_body.skeleton.joints[24].position.v[1] - avg_body.skeleton.joints[25].position.v[1], \
                  avg_body.skeleton.joints[24].position.v[2] - avg_body.skeleton.joints[25].position.v[2]);
-    cv::Vec3f kcross;
-    crossproduct(kcross, k1, k2);
-    float kdot = k1.dot(k2);
-    float K = atan2(norm(kcross), kdot);
-    
+
+    float K;
+    getJointAngle(K, k1, k2);
+
     // L: 19-20-21
-    cv::Vec3f l1(avg_body.skeleton.joints[19].position.v[0] - avg_body.skeleton.joints[20].position.v[0], \
-                 avg_body.skeleton.joints[19].position.v[1] - avg_body.skeleton.joints[20].position.v[1], \
-                 avg_body.skeleton.joints[19].position.v[2] - avg_body.skeleton.joints[20].position.v[2]);
+    cv::Vec3f l1(avg_body.skeleton.joints[20].position.v[0] - avg_body.skeleton.joints[19].position.v[0], \
+                 avg_body.skeleton.joints[20].position.v[1] - avg_body.skeleton.joints[19].position.v[1], \
+                 avg_body.skeleton.joints[20].position.v[2] - avg_body.skeleton.joints[19].position.v[2]);
     cv::Vec3f l2(avg_body.skeleton.joints[20].position.v[0] - avg_body.skeleton.joints[21].position.v[0], \
                  avg_body.skeleton.joints[20].position.v[1] - avg_body.skeleton.joints[21].position.v[1], \
                  avg_body.skeleton.joints[20].position.v[2] - avg_body.skeleton.joints[21].position.v[2]);
-    cv::Vec3f lcross;
-    crossproduct(lcross, l1, l2);
-    float ldot = l1.dot(l2);
-    float L = atan2(norm(lcross), ldot);
+    
+    float L;
+    getJointAngle(L, l1, l2);
+
 
     vector<float> angles = {A,B,C,D,E,F,G,H,I,J,K,L};
+    // verify in terminal output
     for (int ii = 0; ii <angles.size(); ++ii)
     {
-        if (angles[ii] < 0)
-        {
-            angles[ii] += 2*M_PI;
-        }
-        angles[ii] = M_PI - angles[ii];
+        std::cerr << "Angles["<<ii<<"]: " << angles[ii]*180/M_PI << std::endl;
     }
     std::cerr << "finished computing joint angles"<< std::endl;
     return angles;
