@@ -17,6 +17,7 @@ _Keywords_: Motion capture (MOCAP) system, synchronization, Kinect, body-trackin
 ### Demo
 
 > Check out the outcomes on some various movements!
+> Note: this demo experiences some offset due to a parallax problem (devices are at a lower height than the human).
 
 ![Demo](res/3_random_min1.gif)
 
@@ -101,6 +102,7 @@ The following videos and images are tested in the test setup shown above.
 ![Sycned](res/synced.png)
 
 #### Occlusion / Illumination Check
+
 <<<<<<< HEAD
 
 > (3-Device System) Occlusion at Subordinate Device 0 | at Device 1 | Varying Illumination at Master Device
@@ -108,10 +110,13 @@ The following videos and images are tested in the test setup shown above.
 ![occlusion-sub0](res/occlusion_0.png) | ![occlusion-sub0](res/occlusion_1.png) | ![illumination](res/lighting_master.png)
 
 =======
+
 > (3-Device System) Occlusion at Subordinate Device 0 | Occlusion at Device 1 | Varying Illumination at Master Device
 
 ![occlusion-sub0](res/occlusion_0.png) | ![occlusion-sub0](res/occlusion_1.png) | ![illumination](res/lighting_master.png)
->>>>>>> 6f25eddcadff81affc59cb90a3929d1b793f0e72
+
+> > > > > > > 6f25eddcadff81affc59cb90a3929d1b793f0e72
+
 ## Azure Kinect SDK
 
 **Azure Kinect SDK** is a cross platform (Linux and Windows) user mode SDK to read data from your Azure Kinect device.
