@@ -11,11 +11,11 @@ onerun:
 	./$(OUTPUT_FILENAME)
 
 # transformed, not projected, synced, 2 devices
-multi:
-	g++ multi.cpp  $(K4A_FLAGS) $(K4ABT_FLAGS)  $(OPENCV_FLAGS) -o $(OUTPUT_FILENAME)
+# multi:
+# 	g++ multi.cpp  $(K4A_FLAGS) $(K4ABT_FLAGS)  $(OPENCV_FLAGS) -o $(OUTPUT_FILENAME)
 
-multirun: 
-	./$(OUTPUT_FILENAME) 2 9 6 15 1
+# multirun: 
+# 	./$(OUTPUT_FILENAME) 2 9 6 15 1
 
 # transformed, projected, synced, 2 devices
 two:
