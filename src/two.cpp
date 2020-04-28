@@ -309,10 +309,6 @@ int main(int argc, char **argv)
             secondary_intrinstic_matrix(0, 2) = secondary_i.cx;
             secondary_intrinstic_matrix(1, 2) = secondary_i.cy;
             
-            // std::cout << "Intrinsic parameters:" << endl;
-            // std::cout << main_intrinstic_matrix << endl;
-            // std::cout << secondary_intrinstic_matrix << endl;
-
             const k4a_calibration_extrinsics_t &main_ext = main_calibration.extrinsics[K4A_CALIBRATION_TYPE_DEPTH][K4A_CALIBRATION_TYPE_COLOR];
             const k4a_calibration_extrinsics_t &secondary_ext = secondary_calibration.extrinsics[K4A_CALIBRATION_TYPE_DEPTH][K4A_CALIBRATION_TYPE_COLOR];
             Transformation main_ext_tr, secondary_ext_tr;
