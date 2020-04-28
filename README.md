@@ -78,8 +78,8 @@ The following videos and images are tested in the test setup shown above.
 > - [2-Device System, Armbend](https://drive.google.com/open?id=1rNm08ENJNz7gC7qcjfLROrGfcWG34cxD)
 > - [3-Device System, Armbend](https://drive.google.com/open?id=1kvbwZNJAQP5ep4wQ99Aks_qvyKswSmLm)
 
-> - [2-Device Syste, Standing](https://drive.google.com/open?id=1R2_ukCFXL8e6FQaPcC5eoixONgsErfYw)
-> - [3-Device Syste, Standing](https://drive.google.com/open?id=1v21fsoo8cYNsnlP9tcl4umf7r20Sj9_Q)
+> - [2-Device System, Standing](https://drive.google.com/open?id=1R2_ukCFXL8e6FQaPcC5eoixONgsErfYw)
+> - [3-Device System, Standing](https://drive.google.com/open?id=1v21fsoo8cYNsnlP9tcl4umf7r20Sj9_Q)
 
 ---
 > 2-Device | 3 -Device Systems
@@ -91,9 +91,9 @@ The following videos and images are tested in the test setup shown above.
 ![Sycned](res/synced.png)
 
 #### Occlusion / Illumination Check
-> (3-Device System) Occlusion at Subordinate Device 0 | at Device 1 | Varying Illumination at Master Device
+> (3-Device System) Occlusion at Subordinate Device 0 | Occlusion at Device 1 | Varying Illumination at Master Device
 
-![occlusion-sub0](res/occlusion_0.png) | ![occlusion-sub0](res/occlusion_1.png) | ![illumination](res/lighting_master.png
+![occlusion-sub0](res/occlusion_0.png) | ![occlusion-sub0](res/occlusion_1.png) | ![illumination](res/lighting_master.png)
 ## Azure Kinect SDK
 
 **Azure Kinect SDK** is a cross platform (Linux and Windows) user mode SDK to read data from your Azure Kinect device.
