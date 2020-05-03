@@ -108,7 +108,7 @@ The following videos and images are tested in the test setup shown above.
 
 ![Body Joints Labeled](res/bodyjoints_labeled.png)
 
-#### Occlusion / Illumination Effect Verification with 3-dev system
+#### Occlusion / Illumination Effect Verification with 3-deviec System
 
 > Occlusion at Subordinate Device 0 | Occlusion at Subordinate Device 1 | Varying Illumination at Master Device
 
