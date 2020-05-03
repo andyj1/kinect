@@ -1,6 +1,6 @@
 # A Low-Cost Motion Capture System using Synchronized Azure Kinect Systems
 
-by [Andy Jeong](mailto:jeong2cu@gmail.com), [Yue Wang](mailto:leowang1996@gmail.com), [Professor Mili Shah](mailto:mili.shah@cooper.edu), Advisor
+by [Andy Jeong](mailto:jeong2cu@gmail.com), [Yue Wang](mailto:leowang1996@gmail.com), [Professor Mili Shah](mailto:mili.shah@cooper.edu) (Advisor)
 
 **Abstract**
 
@@ -10,9 +10,11 @@ _Keywords_: Motion capture (MOCAP) system, synchronization, Kinect, body-trackin
 
 > See [Azure.com/Kinect](https://Azure.com/kinect) for device info and available documentation.
 
-> Link to poster: [Poster](doc/poster_SIGGRAPH2020.pdf)
+> Link to submitted poster to ACM SIGGRAPH'20: [Poster](doc/poster_SIGGRAPH2020.pdf)
 
-> Link to abstract: [Documentation](doc/abstract_SIGGRAPH2020.pdf)
+> Link to submitted abstract to ACM SIGGRAPH'20: [Abstract](doc/abstract_SIGGRAPH2020.pdf)
+
+> Link to updated documentation: [Documentation (will be updated soon)]()
 
 ### Demo
 
@@ -39,24 +41,23 @@ _Keywords_: Motion capture (MOCAP) system, synchronization, Kinect, body-trackin
 
 ### Software
 
-- Azure Kinect Senor SDK (K4A)
-- Azure Kinect Body Tracking SDK (K4ABT)
-
-### Packages
-
-- OpenCV (`` `pkg-config --cflags --lib opencv` ``)
-- K4A (`-lk4a`)
-- K4ABT (`-lk4abt`)
+- Azure Kinect Senor SDK (K4A) (`-lk4a`)
+- Azure Kinect Body Tracking SDK (K4ABT) (`-lk4abt`)
+- OpenCV (`` `pkg-config --cflags --libs opencv` ``)
 
 ### Building
 
 ```bash
+g++ file.cpp -lk4a -lk4abt `pkg-config --cflags --libs opencv` -o program // compile
+./program                                                                 // execute
+
 // running on a single device
     make one && make onerun
 // running on two synchronized devices
     sudo bash ./script/increaseusbmb.sh // change USB memory bandwidth size
     make two && make tworun
 // running on three synchronized devices
+    sudo bash ./script/increaseusbmb.sh // change USB memory bandwidth size
     make sync && make syncrun
 ```
 
@@ -70,7 +71,9 @@ _Keywords_: Motion capture (MOCAP) system, synchronization, Kinect, body-trackin
 
 ![Configuration](res/testsetup.png)
 
-> Camera Calibration
+> Camera Calibration to capture synchronous images
+>
+> - reference: green screen example from Azure Kinect SDK examples on its GitHub repository
 
 ![calibration](res/calibration_stage.png)
 
@@ -99,25 +102,23 @@ The following videos and images are tested in the test setup shown above.
 
 #### Synchronization
 
+> - on the right: joint angles for angles designated as below
+
 ![Sycned](res/synced.png)
 
-#### Occlusion / Illumination Check
+![Body Joints Labeled](res/bodyjoints_labeled.png)
 
-<<<<<<< HEAD
+#### Occlusion / Illumination Effect Verification with 3-dev system
 
-> (3-Device System) Occlusion at Subordinate Device 0 | at Device 1 | Varying Illumination at Master Device
-
-![occlusion-sub0](res/occlusion_0.png) | ![occlusion-sub0](res/occlusion_1.png) | ![illumination](res/lighting_master.png)
-
-=======
-
-> (3-Device System) Occlusion at Subordinate Device 0 | Occlusion at Device 1 | Varying Illumination at Master Device
+> Occlusion at Subordinate Device 0 | Occlusion at Subordinate Device 1 | Varying Illumination at Master Device
 
 ![occlusion-sub0](res/occlusion_0.png) | ![occlusion-sub0](res/occlusion_1.png) | ![illumination](res/lighting_master.png)
 
-> > > > > > > 6f25eddcadff81affc59cb90a3929d1b793f0e72
+> Example of selection of data streams by confidence levels per joint
 
-## Azure Kinect SDK
+![selection_by_confidence](res/check_confident_devices.png)
+
+## Azure Kinect SDK Details
 
 **Azure Kinect SDK** is a cross platform (Linux and Windows) user mode SDK to read data from your Azure Kinect device.
 
@@ -133,20 +134,14 @@ The Azure Kinect SDK enables you to get the most out of your Azure Kinect camera
 
 ## Current Work
 
-##### 1. Human Pose Data Analysis and Generalized Synchronization from Multiple Microsoft Azure Kinect
+##### 1. Gait Analysis on Exoskeletons
 
-> openpose, alphapose, kinect, Vicon MTS
+> OpenPose, AlphPose, Kinect, Vicon MOCAP system
 
 ##### 2. Graphical Visualization of Tracked Body Joints
 
-> media art collaboration
+> Media art collaboration
 
 ##### 3. Drone Movement Synchronzation from Human Pose
 
-> control of drone system (crazyflie)
-
-### Other
-
-> Example of selection of data streams by confidence levels per joint
-
-![selection_by_confidence](res/check_confident_devices.png)
+> Control of drone system (crazyflie)

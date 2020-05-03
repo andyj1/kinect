@@ -1472,7 +1472,7 @@ void plotBody(k4abt_body_t main_body, k4abt_body_t avg_body, cv::Mat main, cv::M
         // 23: knee right to hip right
         cv::line(imgList.at(0), stream[23], stream[22], color, thickness, 8);
         // 24: ankle right to hip right
-        cv::line(imgList.at(0), stream[24], stream[22], color, thickness, 8);
+        cv::line(imgList.at(0), stream[24], stream[23], color, thickness, 8);
         // 25: foot right to ankle right
         cv::line(imgList.at(0), stream[25], stream[24], color, thickness, 8);
         // 26: head to neck
