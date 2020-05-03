@@ -79,35 +79,47 @@ int main(int argc, char **argv)
     ofstream outfile_orig;
     outfile_orig.open("../saved_data/joints_gen_master.csv", ios::out);
     outfile_orig << ",,Position,,,Orientation,,,,Confidence Level" << std::endl;
-    outfile_orig << "Body ID," << "Joint #," << "x,y,z," << "x,y,z,w" << std::endl;
+    outfile_orig << "Body ID,"
+                 << "Joint #,"
+                 << "x,y,z,"
+                 << "x,y,z,w" << std::endl;
 
     ofstream outfile_sub1;
     outfile_sub1.open("../saved_data/joints_gen_sub1.csv", ios::out);
     outfile_sub1 << ",,Position,,,Orientation,,,,Confidence Level" << std::endl;
-    outfile_sub1 << "Body ID," << "Joint #," << "x,y,z," << "x,y,z,w" << std::endl;
+    outfile_sub1 << "Body ID,"
+                 << "Joint #,"
+                 << "x,y,z,"
+                 << "x,y,z,w" << std::endl;
 
     ofstream outfile_sub2;
     outfile_sub2.open("../saved_data/joints_gen_sub2.csv", ios::out);
     outfile_sub2 << ",,Position,,,Orientation,,,,Confidence Level" << std::endl;
-    outfile_sub2 << "Body ID," << "Joint #," << "x,y,z," << "x,y,z,w" << std::endl;
+    outfile_sub2 << "Body ID,"
+                 << "Joint #,"
+                 << "x,y,z,"
+                 << "x,y,z,w" << std::endl;
 
     ofstream outfile_avg;
     outfile_avg.open("../saved_data/joints_gen_sync.csv", ios::out);
     outfile_avg << ",,Position,,,Orientation,,,,Confidence Level" << std::endl;
-    outfile_avg << "Body ID," << "Joint #," << "x,y,z," << "x,y,z,w" << std::endl;
+    outfile_avg << "Body ID,"
+                << "Joint #,"
+                << "x,y,z,"
+                << "x,y,z,w" << std::endl;
     outfile_avg.close();
-    
+
     ofstream outfile_angles;
     outfile_angles.open("../saved_data/joints_gen_angles.csv", ios::out);
     outfile_angles << "Frame,A,B,C,D,E,F,G,H,I,J,K,L" << std::endl;
     outfile_angles.close();
 
     float chessboard_square_length = 0.; // must be included in the input params
-    int32_t color_exposure_usec = 8000;  // somewhat reasonable default exposure time
-    int32_t powerline_freq = 2;          // default to a 60 Hz powerline
     cv::Size chessboard_pattern(0, 0);   // height, width. Both need to be set.
-    uint16_t depth_threshold = 1000;     // default to 1 meter
     size_t num_devices = 0;
+    uint16_t depth_threshold = 1000;                                  // default to 1 meter
+    int32_t color_exposure_usec = 8000;                               // somewhat reasonable default exposure time
+    int32_t powerline_freq = 60;                                      // default to a 60 Hz powerline
     double calibration_timeout = std::numeric_limits<double>::max();  // 60.0; // default to timing out after 60s of trying to get calibrated
     double greenscreen_duration = std::numeric_limits<double>::max(); // run forever
 
@@ -119,7 +131,7 @@ int main(int argc, char **argv)
 
     if (argc < 5)
     {
-        std::cout << "Usage: green_screen <num-cameras> <board-height> <board-width> <board-square-length> "
+        std::cout << "Usage: sync_program <num-cameras> <board-height> <board-width> <board-square-length> "
                      "[depth-threshold-mm (default 1000)] [color-exposure-time-usec (default 8000)] "
                   << std::endl;
         cerr << "Not enough arguments!\n";
@@ -137,6 +149,7 @@ int main(int argc, char **argv)
         chessboard_pattern.width = atoi(argv[3]);
         chessboard_square_length = static_cast<float>(atof(argv[4]));
 
+        // optional
         if (argc > 5)
         {
             depth_threshold = static_cast<uint16_t>(atoi(argv[5]));
@@ -223,10 +236,10 @@ int main(int argc, char **argv)
         k4abt::tracker secondary_tracker = k4abt::tracker::create(secondary_calibration);
 
         k4abt_body_t main_body;
-        vector<vector<k4abt_body_t>> secondary_body_vector(num_devices-1, std::vector<k4abt_body_t>()); // per body per tracker
+        vector<vector<k4abt_body_t>> secondary_body_vector(num_devices - 1, std::vector<k4abt_body_t>()); // per body per tracker
 
         k4abt::frame main_body_frame;
-        vector<k4abt::frame> secondary_body_frame(num_devices-1); // per tracker
+        vector<k4abt::frame> secondary_body_frame(num_devices - 1); // per tracker
 
         const char *window_title;
         string sec_title;
@@ -244,7 +257,6 @@ int main(int argc, char **argv)
             // =================================captures for body tracker
             vector<k4a::capture> captures;
             captures = capturer.get_synchronized_captures(secondary_config, true);
-
 
             // prepare main tracker body frame
             if (!main_tracker.enqueue_capture(captures[0], std::chrono::milliseconds(K4A_WAIT_INFINITE)))
@@ -292,7 +304,7 @@ int main(int argc, char **argv)
                         }
                     }
                 }
-            }        
+            }
 
             // =================================display synced time of each camera on bottom right of view
             // these color and depth images in CV are for constantly running visualization purposes
@@ -302,10 +314,9 @@ int main(int argc, char **argv)
             std::chrono::microseconds master_color_time = captures[0].get_color_image().get_device_timestamp();
             std::chrono::microseconds sub1_color_time = captures[1].get_color_image().get_device_timestamp();
             std::chrono::microseconds sub2_color_time = captures[2].get_color_image().get_device_timestamp();
-            cv::putText(cv_main_color_image, "Time (master): "+to_string(master_color_time.count()/1000000)+"."+to_string(master_color_time.count()/1000%1000)+" s", cv::Point(cv_main_color_image.cols*2/3+20, cv_main_color_image.rows-110), FONT_HERSHEY_DUPLEX, 1, COLORS_black, 1);
-            cv::putText(cv_main_color_image, "Time (sub1): "+to_string(sub1_color_time.count()/1000000)+"."+to_string(sub1_color_time.count()/1000%1000)+" s", cv::Point(cv_main_color_image.cols*2/3+20, cv_main_color_image.rows-70), FONT_HERSHEY_DUPLEX, 1, COLORS_black, 1);
-            cv::putText(cv_main_color_image, "Time (sub2): "+to_string(sub2_color_time.count()/1000000)+"."+to_string(sub1_color_time.count()/1000%1000)+" s", cv::Point(cv_main_color_image.cols*2/3+20, cv_main_color_image.rows-30), FONT_HERSHEY_DUPLEX, 1, COLORS_black, 1);
-
+            cv::putText(cv_main_color_image, "Time (master): " + to_string(master_color_time.count() / 1000000) + "." + to_string(master_color_time.count() / 1000 % 1000) + " s", cv::Point(cv_main_color_image.cols * 2 / 3 + 20, cv_main_color_image.rows - 110), FONT_HERSHEY_DUPLEX, 1, COLORS_black, 1);
+            cv::putText(cv_main_color_image, "Time (sub1): " + to_string(sub1_color_time.count() / 1000000) + "." + to_string(sub1_color_time.count() / 1000 % 1000) + " s", cv::Point(cv_main_color_image.cols * 2 / 3 + 20, cv_main_color_image.rows - 70), FONT_HERSHEY_DUPLEX, 1, COLORS_black, 1);
+            cv::putText(cv_main_color_image, "Time (sub2): " + to_string(sub2_color_time.count() / 1000000) + "." + to_string(sub1_color_time.count() / 1000 % 1000) + " s", cv::Point(cv_main_color_image.cols * 2 / 3 + 20, cv_main_color_image.rows - 30), FONT_HERSHEY_DUPLEX, 1, COLORS_black, 1);
 
             // =================================intrinsics of the unit and extrinsics between color and depth camera in each device
             const k4a_calibration_intrinsic_parameters_t::_param &main_i = main_calibration.color_camera_calibration.intrinsics.parameters.param;
@@ -334,7 +345,7 @@ int main(int argc, char **argv)
 
             // =================================loop through subordinate mode devices
             cv::Mat cv_secondary_color_image;
-            for (size_t sdev = 0; sdev < (int) (num_devices - 1); sdev++)
+            for (size_t sdev = 0; sdev < (int)(num_devices - 1); sdev++)
             {
                 // reset
                 secondary_body_frame.clear();
@@ -355,15 +366,15 @@ int main(int argc, char **argv)
                     {
                         std::cerr << e.what() << '\n';
                     }
-                    
+
                     // read from main and secondary trackers
                     uint32_t secondary_num_bodies = 0;
                     if (secondary_body_frame[sdev] != nullptr)
                     {
                         secondary_num_bodies = secondary_body_frame[sdev].get_num_bodies();
-                        std::cerr << "secondary bodies("<<sdev<<"):\t" << secondary_num_bodies << " bodies" << endl;
+                        std::cerr << "secondary bodies(" << sdev << "):\t" << secondary_num_bodies << " bodies" << endl;
                     }
-                    
+
                     // proceed if at least master detected bodies
                     if (main_num_bodies > 0)
                     {
@@ -381,19 +392,19 @@ int main(int argc, char **argv)
                         {
                             // extract main body from main frame
                             main_body = main_body_frame.get_body(body_idx);
-                            // if (main_body.id > 0) std::cerr << "main body retrieved. ID: " << main_body.id << std::endl;
-                            
+
                             // skip if this device doesn't detect any bodies
-                            if (secondary_num_bodies <= 0) { 
-                                std::cerr << "sub device:\t"<<sdev<<" didn't find any devices --> "<<secondary_num_bodies << std::endl;
-                            
+                            if (secondary_num_bodies <= 0)
+                            {
+                                std::cerr << "sub device:\t" << sdev << " didn't find any devices --> " << secondary_num_bodies << std::endl;
                             }
-                            else {
+                            else
+                            {
                                 // store sub device body
-                                secondary_body_vector[sdev].push_back(secondary_body_frame[sdev].get_body(body_idx)); // 'i'-th body in 'sdev' tracker
-                                
+                                secondary_body_vector[sdev].push_back(secondary_body_frame[sdev].get_body(body_idx));
+
                                 // append this device to valid subordinate devices
-                                std::cerr << "adding valid sub device:\t"<<sdev<<std::endl;
+                                std::cerr << "adding valid sub device:\t" << sdev << std::endl;
                                 validSubDevices.push_back(sdev);
 
                                 // transform sub to master and store directly
@@ -412,7 +423,8 @@ int main(int argc, char **argv)
                                         {
                                             outfile_sub1 << secondary_body_vector[0][body_idx].id << "," << i << "," << sub1_position.v[0] << "," << sub1_position.v[1] << "," << sub1_position.v[2] << "," << sub1_orientation.v[0] << "," << sub1_orientation.v[1] << "," << sub1_orientation.v[2] << "," << sub1_orientation.v[3] << "," << confidenceEnumMapping(sub1_confidence_level) << "," << std::endl;
                                         }
-                                    } else if (sdev == 1) 
+                                    }
+                                    else if (sdev == 1)
                                     // store subsequent sub device joints data
                                     {
                                         k4a_float3_t sub2_position = secondary_body_vector[1][body_idx].skeleton.joints[i].position;
@@ -422,11 +434,11 @@ int main(int argc, char **argv)
                                         {
                                             outfile_sub2 << secondary_body_vector[1][body_idx].id << "," << i << "," << sub2_position.v[0] << "," << sub2_position.v[1] << "," << sub2_position.v[2] << "," << sub2_orientation.v[0] << "," << sub2_orientation.v[1] << "," << sub2_orientation.v[2] << "," << sub2_orientation.v[3] << "," << confidenceEnumMapping(sub2_confidence_level) << "," << std::endl;
                                         }
-                                    }                    
+                                    }
                                 } // end for loop
-                            } // end (if sub device found bodies)
-                        } // end loop through min number of bodies
-                    } // end (if master device found bodies)
+                            }     // end (if sub device found bodies)
+                        }         // end loop through min number of bodies
+                    }             // end (if master device found bodies)
                     else
                     {
                         std::cerr << "Error! No bodies found in master device:  " << std::endl;
@@ -439,22 +451,24 @@ int main(int argc, char **argv)
                     continue;
                 }
             } // END loop through subordinate mode devices
-            
-            // CHECK:
 
-            if (main_num_bodies > 0) {
+            // CHECK:
+            if (main_num_bodies > 0)
+            {
                 std::cerr << "[DEBUG] master found body:\t\t\t\t" << main_num_bodies << " (master)" << std::endl;
             }
-            else { 
+            else
+            {
                 std::cerr << "[DEBUG] master did NOT find any bodies!" << std::endl;
             }
 
             // std::cerr << "Secondary body vector size (at init): "<< secondary_body_vector.size() << std::endl;
-            std::cerr << "[DEBUG] Valid secondary body devices(total: "<< validSubDevices.size() << ")\t";
-            for (std::vector<int>::iterator it = validSubDevices.begin() ; it != validSubDevices.end(); it++)
+            std::cerr << "[DEBUG] Valid secondary body devices(total: " << validSubDevices.size() << ")\t";
+            for (std::vector<int>::iterator it = validSubDevices.begin(); it != validSubDevices.end(); it++)
                 std::cerr << ' ' << *it;
             std::cerr << " (valid sub devices)\n";
 
+            // move on to take average and project 3-D homogeneous points onto 2-D plane
             if (main_num_bodies > 0)
                 processBodyData(main_body, secondary_body_vector, cv_main_color_image, main_intrinsic_matrix, validSubDevices);
 
@@ -473,12 +487,12 @@ int main(int argc, char **argv)
             // clear entries for the frame
             // std:cerr << "size of secondary body vector: " << secondary_body_vector.size() << std::endl;
             int clearcount = 0;
-            for (auto it = secondary_body_vector.begin(); it != secondary_body_vector.end(); ++it) 
+            for (auto it = secondary_body_vector.begin(); it != secondary_body_vector.end(); ++it)
             {
                 (*it).clear();
                 clearcount++;
             }
-            std::cerr << "clearing..." <<std::endl <<std::endl; 
+            std::cerr << "cleared:\t" << clearcount << std::endl;
 
         } // ========== END while loop
     }     // END main function
@@ -490,9 +504,9 @@ int main(int argc, char **argv)
     outfile_orig.close();
     outfile_sub1.close();
     outfile_sub2.close();
+
     return 0;
 }
-
 
 static cv::Mat color_to_opencv(const k4a::image &im)
 {
@@ -709,7 +723,7 @@ Transformation stereo_calibration(const k4a::calibration &main_calib,
                                        cv::noArray(),
                                        cv::CALIB_FIX_INTRINSIC | cv::CALIB_RATIONAL_MODEL | cv::CALIB_CB_FAST_CHECK);
     std::cout << "Finished calibrating!\n";
-    std::cout << "Got error of " << error << "\n";
+    std::cout << "Calibration Error: " << error << "\n";
     return tr;
 }
 
@@ -811,13 +825,13 @@ static Transformation calibrate_devices(MultiDeviceCapturer &capturer,
         cv::imshow("Chessboard view from main", cv_main_color_image);
         cv::waitKey(1);
 
-        cv::namedWindow("Chessboard view from secondary", CV_WINDOW_AUTOSIZE);
-        cv::imshow("Chessboard view from secondary", cv_secondary_color_image);
-        cv::waitKey(1);
+        // cv::namedWindow("Chessboard view from secondary", CV_WINDOW_AUTOSIZE);
+        // cv::imshow("Chessboard view from secondary", cv_secondary_color_image);
+        // cv::waitKey(1);
 
         // save image
-        cv::imwrite( "./cv_main_color_image.jpg", cv_main_color_image);
-        cv::imwrite( "./cv_secondary_color_image.jpg", cv_secondary_color_image);
+        cv::imwrite("./calibration_master_color_image.jpg", cv_main_color_image);
+        cv::imwrite("./calibration_sub_color_image.jpg", cv_secondary_color_image);
 
         // Get 20 frames before doing calibration.
         if (main_chessboard_corners_list.size() >= 20)
@@ -846,9 +860,9 @@ static k4a::image create_depth_image_like(const k4a::image &im)
 
 void processBodyData(k4abt_body_t main_body, vector<vector<k4abt_body_t>> secondary_body_vector, cv::Mat &main, cv::Matx33f main_intrinsic_matrix, vector<int> validSubDevices)
 {
-    
+
     // take joint stream with higher confidence interval among master and subordinate devices
-    
+
     // find minimum number of bodies to scan through (number of overlapping bodies across devices)
     int min_nbody = 1; // for now, restrict this to 1 body
     // int min_nbody = 1000;
@@ -859,28 +873,28 @@ void processBodyData(k4abt_body_t main_body, vector<vector<k4abt_body_t>> second
     //         min_nbody = secondary_body_vector[sdev].size();
     //     }
     // }
-    
+
     // reformat the secondary body vector into valid secondary body vector
     std::vector<vector<k4abt_body_t>> validSubBodyVector((int)validSubDevices.size(), std::vector<k4abt_body_t>());
     int idx = 0;
-    for (std::vector<int>::iterator it = validSubDevices.begin() ; it != validSubDevices.end(); ++it)
+    for (std::vector<int>::iterator it = validSubDevices.begin(); it != validSubDevices.end(); ++it)
     {
-        std::cerr << "adding body for devices: "<<*it<<std::endl;
+        std::cerr << "adding body for devices: " << *it << std::endl;
         validSubBodyVector[idx] = std::move(secondary_body_vector[*it]);
         idx++;
     }
 
-    std::cerr <<"moving to validSubBodyVector SUCCESS: size = "<<idx <<endl;
+    std::cerr << "moving to validSubBodyVector SUCCESS: size = " << idx << endl;
 
     int totalValidSubCount = validSubDevices.size();
-    for (int num_sdev=0; num_sdev < totalValidSubCount; num_sdev++)
+    for (int num_sdev = 0; num_sdev < totalValidSubCount; num_sdev++)
     {
-        std::cerr << "sample position at joint 0, x, body 0 at each device["<<num_sdev<<"]\t" << validSubBodyVector.at(num_sdev)[0].skeleton.joints[0].position.v[0] << "\t";
+        std::cerr << "sample position at joint 0, x, body 0 at each device[" << num_sdev << "]\t" << validSubBodyVector.at(num_sdev)[0].skeleton.joints[0].position.v[0] << "\t";
     }
     std::cerr << std::endl;
 
     // initialize structures
-    vector<k4abt_body_t> body_dev( validSubDevices.size() + 1 ); // add 1 for master
+    vector<k4abt_body_t> body_dev(validSubDevices.size() + 1); // add 1 for master
     body_dev.clear();
 
     // append master device body at 0
@@ -893,24 +907,24 @@ void processBodyData(k4abt_body_t main_body, vector<vector<k4abt_body_t>> second
     std::vector<std::vector<int>> highest_conf_dev(K4ABT_JOINT_COUNT);
 
     // iterate through bodies
-    for (int bodyid=0; bodyid < min_nbody; bodyid++)
+    for (int bodyid = 0; bodyid < min_nbody; bodyid++)
     {
         avg_body.id = bodyid;
-        
-        // reset 
-        for (auto it = highest_conf_dev.begin(); it != highest_conf_dev.end(); ++it) 
+
+        // reset
+        for (auto it = highest_conf_dev.begin(); it != highest_conf_dev.end(); ++it)
         {
             (*it).clear();
         }
 
         // append sub device bodies
-        for (int num_sdev=0; num_sdev < totalValidSubCount; num_sdev++)
+        for (int num_sdev = 0; num_sdev < totalValidSubCount; num_sdev++)
         {
             body_dev.push_back(validSubBodyVector[num_sdev][bodyid]);
         }
 
         // sort master and sub device bodies by confidence levels: MEDIUM --> LOW --> EVERYTHING ELSE
-        for (int curr_dev=0; curr_dev < (int)body_dev.size(); curr_dev++)
+        for (int curr_dev = 0; curr_dev < (int)body_dev.size(); curr_dev++)
         {
             for (int joint = 0; joint < (int)K4ABT_JOINT_COUNT; joint++)
             {
@@ -921,7 +935,7 @@ void processBodyData(k4abt_body_t main_body, vector<vector<k4abt_body_t>> second
             }
         }
         // get device numbers that have LOW confidence level for each joint, if the joint is not found with MEDIUM confidence level
-        for (int curr_dev=0; curr_dev < (int)body_dev.size(); curr_dev++)
+        for (int curr_dev = 0; curr_dev < (int)body_dev.size(); curr_dev++)
         {
             for (int joint = 0; joint < (int)K4ABT_JOINT_COUNT; joint++)
             {
@@ -936,7 +950,7 @@ void processBodyData(k4abt_body_t main_body, vector<vector<k4abt_body_t>> second
         {
             if (highest_conf_dev[joint].size() == 0)
             {
-                for (int num_dev=1; num_dev < totalValidSubCount; num_dev++)
+                for (int num_dev = 1; num_dev < totalValidSubCount; num_dev++)
                 {
                     highest_conf_dev[joint].push_back(num_dev);
                 }
@@ -945,16 +959,19 @@ void processBodyData(k4abt_body_t main_body, vector<vector<k4abt_body_t>> second
 
         // check which devices each joint is pulling data from
         int jointCount = 0;
-        for(auto& row : highest_conf_dev){
+        for (auto &row : highest_conf_dev)
+        {
             jointCount++;
-            std::cerr << "[DEBUG] joint: " << jointCount << " / " << "confident device: ";
-            for (std::vector<int>::iterator it = row.begin() ; it != row.end(); ++it)
+            std::cerr << "[DEBUG] joint: " << jointCount << " / "
+                      << "confident device: ";
+            for (std::vector<int>::iterator it = row.begin(); it != row.end(); ++it)
             {
                 std::cerr << *it << " ";
             }
-            std:cerr << std::endl;
+        std:
+            cerr << std::endl;
         }
-        
+
         // pull data / average data from the found devices
         // initialize average body object to store(replace joint data)
 
@@ -963,7 +980,8 @@ void processBodyData(k4abt_body_t main_body, vector<vector<k4abt_body_t>> second
         k4a_quaternion_t conf_joint_quat;
 
         // iterate through joints
-        for(auto& row : highest_conf_dev){
+        for (auto &row : highest_conf_dev)
+        {
             // reset position for all subs
             avg_pos.xyz.x = 0;
             avg_pos.xyz.y = 0;
@@ -982,8 +1000,8 @@ void processBodyData(k4abt_body_t main_body, vector<vector<k4abt_body_t>> second
             avg_orient.v[3] = 0;
             if (row.size() > 1) // if there is at least one subordinate device that is confident
             {
-                std::cerr << "# of confident sub devices for joint("<<joint_count+1<<"): ";// (" << highest_conf_dev[joint_count].size()<<" dev total)";
-                for (std::vector<int>::iterator it = row.begin() ; it != row.end(); ++it)
+                std::cerr << "# of confident sub devices for joint(" << joint_count + 1 << "): "; // (" << highest_conf_dev[joint_count].size()<<" dev total)";
+                for (std::vector<int>::iterator it = row.begin(); it != row.end(); ++it)
                 {
                     std::cerr << "\t" << *it << " ";
                 }
@@ -993,11 +1011,11 @@ void processBodyData(k4abt_body_t main_body, vector<vector<k4abt_body_t>> second
                 int rowsize = 0;
                 int iter = 0;
                 // iterate through all "confident" devices
-                for (int idx = 0; idx < row.size();idx++)
+                for (int idx = 0; idx < row.size(); idx++)
                 {
                     iter = row.at(idx);
-                    std::cerr<<"going through device:\t"<< iter << std::endl;
-                    
+                    std::cerr << "going through device:\t" << iter << std::endl;
+
                     // set main body to be initial for avg body coordinates
                     if (iter == 0) // master
                     {
@@ -1016,62 +1034,66 @@ void processBodyData(k4abt_body_t main_body, vector<vector<k4abt_body_t>> second
                         };
                         rowsize++;
                         std::cerr << "master joint data added" << std::endl;
-                    } else if (iter > 0) {
+                    }
+                    else if (iter > 0)
+                    {
 
-                        conf_joint_pos = validSubBodyVector[iter-1][bodyid].skeleton.joints[joint_count].position;
+                        conf_joint_pos = validSubBodyVector[iter - 1][bodyid].skeleton.joints[joint_count].position;
                         avg_pos.xyz.x += conf_joint_pos.xyz.x;
                         avg_pos.xyz.y += conf_joint_pos.xyz.y;
                         avg_pos.xyz.z += conf_joint_pos.xyz.z;
 
-                        conf_joint_quat = validSubBodyVector[iter-1][bodyid].skeleton.joints[joint_count].orientation;
+                        conf_joint_quat = validSubBodyVector[iter - 1][bodyid].skeleton.joints[joint_count].orientation;
                         avg_orient.wxyz.w += conf_joint_quat.wxyz.w;
                         avg_orient.wxyz.x += conf_joint_quat.wxyz.x;
                         avg_orient.wxyz.y += conf_joint_quat.wxyz.y;
                         avg_orient.wxyz.z += conf_joint_quat.wxyz.z;
 
                         // confidence level
-                        k4abt_joint_confidence_level_t secondary_dev_conf_level = validSubBodyVector[iter-1][bodyid].skeleton.joints[joint_count].confidence_level;
+                        k4abt_joint_confidence_level_t secondary_dev_conf_level = validSubBodyVector[iter - 1][bodyid].skeleton.joints[joint_count].confidence_level;
                         if (avg_confidence < secondary_dev_conf_level)
                         {
                             avg_confidence = secondary_dev_conf_level;
                         };
                         rowsize++;
-                        std::cerr << "joint data added for up to "<<iter<<" subordinate devices" << std::endl;
+                        std::cerr << "joint data added for up to " << iter << " subordinate devices" << std::endl;
                     }
                     //  verify main, sub 0, sub 1
-                    std::cerr << "Master: ("<<main_body.skeleton.joints[joint_count].position.xyz.x<<", "<<main_body.skeleton.joints[joint_count].position.xyz.y<<", "<<main_body.skeleton.joints[joint_count].position.xyz.z<<")"<<endl;
+                    std::cerr << "Master: (" << main_body.skeleton.joints[joint_count].position.xyz.x << ", " << main_body.skeleton.joints[joint_count].position.xyz.y << ", " << main_body.skeleton.joints[joint_count].position.xyz.z << ")" << endl;
                     if (iter > 0) // print for subordinate devices
                     {
-                        std::cerr<<"Sub["<<iter<<"]: ("<<validSubBodyVector[iter-1][bodyid].skeleton.joints[joint_count].position.xyz.x<<", "<<validSubBodyVector[iter-1][bodyid].skeleton.joints[joint_count].position.xyz.y<<", "<<validSubBodyVector[iter-1][bodyid].skeleton.joints[joint_count].position.xyz.z<<")"<<std::endl;
+                        std::cerr << "Sub[" << iter << "]: (" << validSubBodyVector[iter - 1][bodyid].skeleton.joints[joint_count].position.xyz.x << ", " << validSubBodyVector[iter - 1][bodyid].skeleton.joints[joint_count].position.xyz.y << ", " << validSubBodyVector[iter - 1][bodyid].skeleton.joints[joint_count].position.xyz.z << ")" << std::endl;
                     }
                 }
 
                 // divide position, quaternion by the number of all devices added for average
-                std::cerr << "averaging over (how many devices):\t"<<rowsize<<std::endl;
+                std::cerr << "averaging over (how many devices):\t" << rowsize << std::endl;
 
-                avg_pos.xyz.x = avg_pos.v[0] = avg_pos.xyz.x/rowsize;
-                avg_pos.xyz.y = avg_pos.v[1] = avg_pos.xyz.y/rowsize;
-                avg_pos.xyz.z = avg_pos.v[2] = avg_pos.xyz.z/rowsize;
-                
-                avg_orient.wxyz.w = avg_orient.v[0] = avg_orient.wxyz.w/rowsize;
-                avg_orient.wxyz.x = avg_orient.v[1] = avg_orient.wxyz.x/rowsize;
-                avg_orient.wxyz.y = avg_orient.v[2] = avg_orient.wxyz.y/rowsize;
-                avg_orient.wxyz.z = avg_orient.v[3] = avg_orient.wxyz.z/rowsize;
+                avg_pos.xyz.x = avg_pos.v[0] = avg_pos.xyz.x / rowsize;
+                avg_pos.xyz.y = avg_pos.v[1] = avg_pos.xyz.y / rowsize;
+                avg_pos.xyz.z = avg_pos.v[2] = avg_pos.xyz.z / rowsize;
+
+                avg_orient.wxyz.w = avg_orient.v[0] = avg_orient.wxyz.w / rowsize;
+                avg_orient.wxyz.x = avg_orient.v[1] = avg_orient.wxyz.x / rowsize;
+                avg_orient.wxyz.y = avg_orient.v[2] = avg_orient.wxyz.y / rowsize;
+                avg_orient.wxyz.z = avg_orient.v[3] = avg_orient.wxyz.z / rowsize;
 
                 // create a joint object with the averaged position and quaternion
                 // update body: keep first device's body ID, update each joint data
-                
+
                 avg_body.skeleton.joints[joint_count].position = avg_pos;
                 avg_body.skeleton.joints[joint_count].orientation = avg_orient;
                 avg_body.skeleton.joints[joint_count].confidence_level = avg_confidence;
 
                 joint_count++;
-                std::cerr << "AVG for joint[" << joint_count << "]: (" << avg_body.skeleton.joints[joint_count].position.xyz.x << ", " << avg_body.skeleton.joints[joint_count].position.xyz.y << ", " << avg_body.skeleton.joints[joint_count].position.xyz.z << "), confidence: "<<avg_body.skeleton.joints[joint_count].confidence_level << std::endl;
+                std::cerr << "AVG for joint[" << joint_count << "]: (" << avg_body.skeleton.joints[joint_count].position.xyz.x << ", " << avg_body.skeleton.joints[joint_count].position.xyz.y << ", " << avg_body.skeleton.joints[joint_count].position.xyz.z << "), confidence: " << avg_body.skeleton.joints[joint_count].confidence_level << std::endl;
 
-                std::cerr << std::endl << std::endl;
+                std::cerr << std::endl
+                          << std::endl;
             } // end joints if there is at least one subordinate device
-            else if (row.size() == 1) { 
-                std::cerr<<"[NO SUB DETECTED] going through device:\t"<< 0 << std::endl;
+            else if (row.size() == 1)
+            {
+                std::cerr << "[NO SUB DETECTED] going through device:\t" << 0 << std::endl;
                 // if only master is present
                 avg_pos.xyz.x += main_body.skeleton.joints[joint_count].position.xyz.x;
                 avg_pos.xyz.y += main_body.skeleton.joints[joint_count].position.xyz.y;
@@ -1083,22 +1105,24 @@ void processBodyData(k4abt_body_t main_body, vector<vector<k4abt_body_t>> second
                 avg_orient.wxyz.z += main_body.skeleton.joints[joint_count].orientation.wxyz.z;
 
                 avg_confidence = main_body.skeleton.joints[joint_count].confidence_level;
-                if (avg_confidence < 0 || avg_confidence > 5) avg_confidence = K4ABT_JOINT_CONFIDENCE_LOW; // exceptional cases
+                if (avg_confidence < 0 || avg_confidence > 5)
+                    avg_confidence = K4ABT_JOINT_CONFIDENCE_LOW; // exceptional cases
 
                 avg_body.skeleton.joints[joint_count].position = avg_pos;
                 avg_body.skeleton.joints[joint_count].orientation = avg_orient;
                 avg_body.skeleton.joints[joint_count].confidence_level = avg_confidence;
 
                 joint_count++;
-                std::cerr << "Master: [" << joint_count << "]: (" << avg_body.skeleton.joints[joint_count].position.xyz.x << ", " << avg_body.skeleton.joints[joint_count].position.xyz.y << ", " << avg_body.skeleton.joints[joint_count].position.xyz.z << "), confidence: "<<avg_body.skeleton.joints[joint_count].confidence_level << std::endl;
-                
-                std::cerr << std::endl << std::endl;
+                std::cerr << "Master: [" << joint_count << "]: (" << avg_body.skeleton.joints[joint_count].position.xyz.x << ", " << avg_body.skeleton.joints[joint_count].position.xyz.y << ", " << avg_body.skeleton.joints[joint_count].position.xyz.z << "), confidence: " << avg_body.skeleton.joints[joint_count].confidence_level << std::endl;
+
+                std::cerr << std::endl
+                          << std::endl;
             }
         }
-       
+
         // store averaged data information
         ofstream outfile_avg;
-        outfile_avg.open("../saved_data/joints_gen_sync.csv", ios::out|ios::app);
+        outfile_avg.open("../saved_data/joints_gen_sync.csv", ios::out | ios::app);
         for (int i = 0; i < (int)K4ABT_JOINT_COUNT; i++)
         {
             k4a_float3_t avg_position = avg_body.skeleton.joints[i].position;
@@ -1114,170 +1138,175 @@ void processBodyData(k4abt_body_t main_body, vector<vector<k4abt_body_t>> second
         plotBody(main_body, avg_body, main, main_intrinsic_matrix);
     } // end this body ID
     std::cerr << "finished going through all master and subordinate devices" << std::endl;
-    
-    
 }
 
+/*
+    given two 3-D vectors, computes the internal joint angle
+ */
 void getJointAngle(float &ans, cv::Vec3f &p1, cv::Vec3f &p2)
 {
     cv::Vec3f fcross;
-    fcross[0] = p1[1]*p2[2] - p1[2]*p2[1];
-    fcross[1] = p1[2]*p2[0] - p1[0]*p2[2];
-    fcross[2] = p1[0]*p2[1] - p1[1]*p2[0];
+    // cross product of p1 and p2
+    fcross[0] = p1[1] * p2[2] - p1[2] * p2[1];
+    fcross[1] = p1[2] * p2[0] - p1[0] * p2[2];
+    fcross[2] = p1[0] * p2[1] - p1[1] * p2[0];
     // take norm of cross product: sqrt(fcrossx * fcrossx + fcrossy * fcrossy + fcrossz * fcrossz);
     float fcross_norm = norm(fcross);
     // take dot product: p1[0] * p2[0] + p1[1] * p2[1] + p1[2] * p2[2];
     float fdot = p1.dot(p2);
+    // take atan2 so it falls within -pi/2 and pi/2 radians (+pi if in 2nd/4th quadrant (negative))
     ans = atan2(fcross_norm, fdot);
 }
+
+/*
+    given a body structure, computes the angles A-L;
+ */
 std::vector<float> computeJointAngles(k4abt_body_t avg_body)
 {
     // plot angles from 3D positions
     // A: 12-13-14
-    cv::Vec3f a1(avg_body.skeleton.joints[13].position.v[0] - avg_body.skeleton.joints[12].position.v[0], \
-                 avg_body.skeleton.joints[13].position.v[1] - avg_body.skeleton.joints[12].position.v[1], \
+    cv::Vec3f a1(avg_body.skeleton.joints[13].position.v[0] - avg_body.skeleton.joints[12].position.v[0],
+                 avg_body.skeleton.joints[13].position.v[1] - avg_body.skeleton.joints[12].position.v[1],
                  avg_body.skeleton.joints[13].position.v[2] - avg_body.skeleton.joints[12].position.v[2]);
-    cv::Vec3f a2(avg_body.skeleton.joints[13].position.v[0] - avg_body.skeleton.joints[14].position.v[0], \
-                 avg_body.skeleton.joints[13].position.v[1] - avg_body.skeleton.joints[14].position.v[1], \
+    cv::Vec3f a2(avg_body.skeleton.joints[13].position.v[0] - avg_body.skeleton.joints[14].position.v[0],
+                 avg_body.skeleton.joints[13].position.v[1] - avg_body.skeleton.joints[14].position.v[1],
                  avg_body.skeleton.joints[13].position.v[2] - avg_body.skeleton.joints[14].position.v[2]);
-    
+
     float A;
     getJointAngle(A, a1, a2);
 
     // B: 5-6-7
-    cv::Vec3f b1(avg_body.skeleton.joints[6].position.v[0] - avg_body.skeleton.joints[5].position.v[0], \
-                 avg_body.skeleton.joints[6].position.v[1] - avg_body.skeleton.joints[5].position.v[1], \
+    cv::Vec3f b1(avg_body.skeleton.joints[6].position.v[0] - avg_body.skeleton.joints[5].position.v[0],
+                 avg_body.skeleton.joints[6].position.v[1] - avg_body.skeleton.joints[5].position.v[1],
                  avg_body.skeleton.joints[6].position.v[2] - avg_body.skeleton.joints[5].position.v[2]);
-    cv::Vec3f b2(avg_body.skeleton.joints[6].position.v[0] - avg_body.skeleton.joints[7].position.v[0], \
-                 avg_body.skeleton.joints[6].position.v[1] - avg_body.skeleton.joints[7].position.v[1], \
+    cv::Vec3f b2(avg_body.skeleton.joints[6].position.v[0] - avg_body.skeleton.joints[7].position.v[0],
+                 avg_body.skeleton.joints[6].position.v[1] - avg_body.skeleton.joints[7].position.v[1],
                  avg_body.skeleton.joints[6].position.v[2] - avg_body.skeleton.joints[7].position.v[2]);
-    
+
     float B;
     getJointAngle(B, b1, b2);
 
     // C: 11-12-13
-    cv::Vec3f c1(avg_body.skeleton.joints[12].position.v[0] - avg_body.skeleton.joints[11].position.v[0], \
-                 avg_body.skeleton.joints[12].position.v[1] - avg_body.skeleton.joints[11].position.v[1], \
+    cv::Vec3f c1(avg_body.skeleton.joints[12].position.v[0] - avg_body.skeleton.joints[11].position.v[0],
+                 avg_body.skeleton.joints[12].position.v[1] - avg_body.skeleton.joints[11].position.v[1],
                  avg_body.skeleton.joints[12].position.v[2] - avg_body.skeleton.joints[11].position.v[2]);
-    cv::Vec3f c2(avg_body.skeleton.joints[12].position.v[0] - avg_body.skeleton.joints[13].position.v[0], \
-                 avg_body.skeleton.joints[12].position.v[1] - avg_body.skeleton.joints[13].position.v[1], \
+    cv::Vec3f c2(avg_body.skeleton.joints[12].position.v[0] - avg_body.skeleton.joints[13].position.v[0],
+                 avg_body.skeleton.joints[12].position.v[1] - avg_body.skeleton.joints[13].position.v[1],
                  avg_body.skeleton.joints[12].position.v[2] - avg_body.skeleton.joints[13].position.v[2]);
-    
+
     float C;
     getJointAngle(C, c1, c2);
 
     // D: 4-5-6
-    cv::Vec3f d1(avg_body.skeleton.joints[5].position.v[0] - avg_body.skeleton.joints[4].position.v[0], \
-                 avg_body.skeleton.joints[5].position.v[1] - avg_body.skeleton.joints[4].position.v[1], \
+    cv::Vec3f d1(avg_body.skeleton.joints[5].position.v[0] - avg_body.skeleton.joints[4].position.v[0],
+                 avg_body.skeleton.joints[5].position.v[1] - avg_body.skeleton.joints[4].position.v[1],
                  avg_body.skeleton.joints[5].position.v[2] - avg_body.skeleton.joints[4].position.v[2]);
-    cv::Vec3f d2(avg_body.skeleton.joints[5].position.v[0] - avg_body.skeleton.joints[6].position.v[0], \
-                 avg_body.skeleton.joints[5].position.v[1] - avg_body.skeleton.joints[6].position.v[1], \
+    cv::Vec3f d2(avg_body.skeleton.joints[5].position.v[0] - avg_body.skeleton.joints[6].position.v[0],
+                 avg_body.skeleton.joints[5].position.v[1] - avg_body.skeleton.joints[6].position.v[1],
                  avg_body.skeleton.joints[5].position.v[2] - avg_body.skeleton.joints[6].position.v[2]);
-    
+
     float D;
     getJointAngle(D, d1, d2);
 
     // E: 1-0-22
-    cv::Vec3f e1(avg_body.skeleton.joints[0].position.v[0] - avg_body.skeleton.joints[1].position.v[0], \
-                 avg_body.skeleton.joints[0].position.v[1] - avg_body.skeleton.joints[1].position.v[1], \
+    cv::Vec3f e1(avg_body.skeleton.joints[0].position.v[0] - avg_body.skeleton.joints[1].position.v[0],
+                 avg_body.skeleton.joints[0].position.v[1] - avg_body.skeleton.joints[1].position.v[1],
                  avg_body.skeleton.joints[0].position.v[2] - avg_body.skeleton.joints[1].position.v[2]);
-    cv::Vec3f e2(avg_body.skeleton.joints[0].position.v[0] - avg_body.skeleton.joints[22].position.v[0], \
-                 avg_body.skeleton.joints[0].position.v[1] - avg_body.skeleton.joints[22].position.v[1], \
+    cv::Vec3f e2(avg_body.skeleton.joints[0].position.v[0] - avg_body.skeleton.joints[22].position.v[0],
+                 avg_body.skeleton.joints[0].position.v[1] - avg_body.skeleton.joints[22].position.v[1],
                  avg_body.skeleton.joints[0].position.v[2] - avg_body.skeleton.joints[22].position.v[2]);
-    
+
     float E;
     getJointAngle(E, e1, e2);
 
     // F: 1-0-18
-    cv::Vec3f f1(avg_body.skeleton.joints[0].position.v[0] - avg_body.skeleton.joints[1].position.v[0], \
-                 avg_body.skeleton.joints[0].position.v[1] - avg_body.skeleton.joints[1].position.v[1], \
+    cv::Vec3f f1(avg_body.skeleton.joints[0].position.v[0] - avg_body.skeleton.joints[1].position.v[0],
+                 avg_body.skeleton.joints[0].position.v[1] - avg_body.skeleton.joints[1].position.v[1],
                  avg_body.skeleton.joints[0].position.v[2] - avg_body.skeleton.joints[1].position.v[2]);
-    cv::Vec3f f2(avg_body.skeleton.joints[0].position.v[0] - avg_body.skeleton.joints[18].position.v[0], \
-                 avg_body.skeleton.joints[0].position.v[1] - avg_body.skeleton.joints[18].position.v[1], \
+    cv::Vec3f f2(avg_body.skeleton.joints[0].position.v[0] - avg_body.skeleton.joints[18].position.v[0],
+                 avg_body.skeleton.joints[0].position.v[1] - avg_body.skeleton.joints[18].position.v[1],
                  avg_body.skeleton.joints[0].position.v[2] - avg_body.skeleton.joints[18].position.v[2]);
-    
+
     float F;
     getJointAngle(F, f1, f2);
 
     // G: 0-22-23
-    cv::Vec3f g1(avg_body.skeleton.joints[22].position.v[0] - avg_body.skeleton.joints[0].position.v[0], \
-                 avg_body.skeleton.joints[22].position.v[1] - avg_body.skeleton.joints[0].position.v[1], \
+    cv::Vec3f g1(avg_body.skeleton.joints[22].position.v[0] - avg_body.skeleton.joints[0].position.v[0],
+                 avg_body.skeleton.joints[22].position.v[1] - avg_body.skeleton.joints[0].position.v[1],
                  avg_body.skeleton.joints[22].position.v[2] - avg_body.skeleton.joints[0].position.v[2]);
-    cv::Vec3f g2(avg_body.skeleton.joints[22].position.v[0] - avg_body.skeleton.joints[23].position.v[0], \
-                 avg_body.skeleton.joints[22].position.v[1] - avg_body.skeleton.joints[23].position.v[1], \
+    cv::Vec3f g2(avg_body.skeleton.joints[22].position.v[0] - avg_body.skeleton.joints[23].position.v[0],
+                 avg_body.skeleton.joints[22].position.v[1] - avg_body.skeleton.joints[23].position.v[1],
                  avg_body.skeleton.joints[22].position.v[2] - avg_body.skeleton.joints[23].position.v[2]);
-    
+
     float G;
     getJointAngle(G, g1, g2);
 
     // H: 0-18-19
-    cv::Vec3f h1(avg_body.skeleton.joints[18].position.v[0] - avg_body.skeleton.joints[0].position.v[0], \
-                 avg_body.skeleton.joints[18].position.v[1] - avg_body.skeleton.joints[0].position.v[1], \
+    cv::Vec3f h1(avg_body.skeleton.joints[18].position.v[0] - avg_body.skeleton.joints[0].position.v[0],
+                 avg_body.skeleton.joints[18].position.v[1] - avg_body.skeleton.joints[0].position.v[1],
                  avg_body.skeleton.joints[18].position.v[2] - avg_body.skeleton.joints[0].position.v[2]);
-    cv::Vec3f h2(avg_body.skeleton.joints[18].position.v[0] - avg_body.skeleton.joints[19].position.v[0], \
-                 avg_body.skeleton.joints[18].position.v[1] - avg_body.skeleton.joints[19].position.v[1], \
+    cv::Vec3f h2(avg_body.skeleton.joints[18].position.v[0] - avg_body.skeleton.joints[19].position.v[0],
+                 avg_body.skeleton.joints[18].position.v[1] - avg_body.skeleton.joints[19].position.v[1],
                  avg_body.skeleton.joints[18].position.v[2] - avg_body.skeleton.joints[19].position.v[2]);
 
     float H;
     getJointAngle(H, h1, h2);
 
     // I: 22-23-24
-    cv::Vec3f i1(avg_body.skeleton.joints[23].position.v[0] - avg_body.skeleton.joints[22].position.v[0], \
-                 avg_body.skeleton.joints[23].position.v[1] - avg_body.skeleton.joints[22].position.v[1], \
+    cv::Vec3f i1(avg_body.skeleton.joints[23].position.v[0] - avg_body.skeleton.joints[22].position.v[0],
+                 avg_body.skeleton.joints[23].position.v[1] - avg_body.skeleton.joints[22].position.v[1],
                  avg_body.skeleton.joints[23].position.v[2] - avg_body.skeleton.joints[22].position.v[2]);
-    cv::Vec3f i2(avg_body.skeleton.joints[23].position.v[0] - avg_body.skeleton.joints[24].position.v[0], \
-                 avg_body.skeleton.joints[23].position.v[1] - avg_body.skeleton.joints[24].position.v[1], \
+    cv::Vec3f i2(avg_body.skeleton.joints[23].position.v[0] - avg_body.skeleton.joints[24].position.v[0],
+                 avg_body.skeleton.joints[23].position.v[1] - avg_body.skeleton.joints[24].position.v[1],
                  avg_body.skeleton.joints[23].position.v[2] - avg_body.skeleton.joints[24].position.v[2]);
-    
+
     float I;
     getJointAngle(I, i1, i2);
 
     // J: 18-19-20
-    cv::Vec3f j1(avg_body.skeleton.joints[19].position.v[0] - avg_body.skeleton.joints[18].position.v[0], \
-                 avg_body.skeleton.joints[19].position.v[1] - avg_body.skeleton.joints[18].position.v[1], \
+    cv::Vec3f j1(avg_body.skeleton.joints[19].position.v[0] - avg_body.skeleton.joints[18].position.v[0],
+                 avg_body.skeleton.joints[19].position.v[1] - avg_body.skeleton.joints[18].position.v[1],
                  avg_body.skeleton.joints[19].position.v[2] - avg_body.skeleton.joints[18].position.v[2]);
-    cv::Vec3f j2(avg_body.skeleton.joints[19].position.v[0] - avg_body.skeleton.joints[20].position.v[0], \
-                 avg_body.skeleton.joints[19].position.v[1] - avg_body.skeleton.joints[20].position.v[1], \
+    cv::Vec3f j2(avg_body.skeleton.joints[19].position.v[0] - avg_body.skeleton.joints[20].position.v[0],
+                 avg_body.skeleton.joints[19].position.v[1] - avg_body.skeleton.joints[20].position.v[1],
                  avg_body.skeleton.joints[19].position.v[2] - avg_body.skeleton.joints[20].position.v[2]);
-    
+
     float J;
     getJointAngle(J, j1, j2);
 
-    
     // K: 23-24-25
-    cv::Vec3f k1(avg_body.skeleton.joints[24].position.v[0] - avg_body.skeleton.joints[23].position.v[0], \
-                 avg_body.skeleton.joints[24].position.v[1] - avg_body.skeleton.joints[23].position.v[1], \
+    cv::Vec3f k1(avg_body.skeleton.joints[24].position.v[0] - avg_body.skeleton.joints[23].position.v[0],
+                 avg_body.skeleton.joints[24].position.v[1] - avg_body.skeleton.joints[23].position.v[1],
                  avg_body.skeleton.joints[24].position.v[2] - avg_body.skeleton.joints[23].position.v[2]);
-    cv::Vec3f k2(avg_body.skeleton.joints[24].position.v[0] - avg_body.skeleton.joints[25].position.v[0], \
-                 avg_body.skeleton.joints[24].position.v[1] - avg_body.skeleton.joints[25].position.v[1], \
+    cv::Vec3f k2(avg_body.skeleton.joints[24].position.v[0] - avg_body.skeleton.joints[25].position.v[0],
+                 avg_body.skeleton.joints[24].position.v[1] - avg_body.skeleton.joints[25].position.v[1],
                  avg_body.skeleton.joints[24].position.v[2] - avg_body.skeleton.joints[25].position.v[2]);
 
     float K;
     getJointAngle(K, k1, k2);
 
     // L: 19-20-21
-    cv::Vec3f l1(avg_body.skeleton.joints[20].position.v[0] - avg_body.skeleton.joints[19].position.v[0], \
-                 avg_body.skeleton.joints[20].position.v[1] - avg_body.skeleton.joints[19].position.v[1], \
+    cv::Vec3f l1(avg_body.skeleton.joints[20].position.v[0] - avg_body.skeleton.joints[19].position.v[0],
+                 avg_body.skeleton.joints[20].position.v[1] - avg_body.skeleton.joints[19].position.v[1],
                  avg_body.skeleton.joints[20].position.v[2] - avg_body.skeleton.joints[19].position.v[2]);
-    cv::Vec3f l2(avg_body.skeleton.joints[20].position.v[0] - avg_body.skeleton.joints[21].position.v[0], \
-                 avg_body.skeleton.joints[20].position.v[1] - avg_body.skeleton.joints[21].position.v[1], \
+    cv::Vec3f l2(avg_body.skeleton.joints[20].position.v[0] - avg_body.skeleton.joints[21].position.v[0],
+                 avg_body.skeleton.joints[20].position.v[1] - avg_body.skeleton.joints[21].position.v[1],
                  avg_body.skeleton.joints[20].position.v[2] - avg_body.skeleton.joints[21].position.v[2]);
-    
+
     float L;
     getJointAngle(L, l1, l2);
 
-
-    vector<float> angles = {A,B,C,D,E,F,G,H,I,J,K,L};
+    vector<float> angles = {A, B, C, D, E, F, G, H, I, J, K, L};
     // verify in terminal output
-    for (int ii = 0; ii <angles.size(); ++ii)
+    for (int ii = 0; ii < angles.size(); ++ii)
     {
-        std::cerr << "Angles["<<ii<<"]: " << angles[ii]*180/M_PI << std::endl;
+        std::cerr << "Angle [" << ii << "]: " << angles[ii] * 180 / M_PI << " (deg)" << std::endl;
     }
-    std::cerr << "finished computing joint angles"<< std::endl;
+    std::cerr << "finished computing joint angles" << std::endl;
     return angles;
-
 }
 
+// TODO: calculate joint angles from quaternions
 std::vector<float> computeJointAnglesQuat(cv::Mat main, k4abt_body_t avg_body)
 {
     std::vector<float> angles;
@@ -1294,75 +1323,82 @@ std::vector<float> computeJointAnglesQuat(cv::Mat main, k4abt_body_t avg_body)
     // K: 23-24-25
     // L: 19-20-21
     return angles;
-    
 }
 
-
+/*
+    projects 3-D to 2-D and plots the master and averaged bodies
+ */
 void plotBody(k4abt_body_t main_body, k4abt_body_t avg_body, cv::Mat main, cv::Matx33f main_intrinsic_matrix)
 {
-
     std::vector<cv::Point> dataMain, dataSecondary, dataAvg;
     Mat mainstream(3, K4ABT_JOINT_COUNT, CV_32F), avgstream(3, K4ABT_JOINT_COUNT, CV_32F);
     std::vector<cv::Point3f> main_points, avg_points; // input to projectPoints
 
-    // compute joint angles
+    // joint angles START
     vector<float> joint_angles = computeJointAngles(avg_body);
     // vector<float> joint_angles_quat = computeJointAnglesQuat(main, avg_body);
-    
+
     int offset = 0;
     int index = 0;
     string angle;
     ofstream outfile_angles;
-    outfile_angles.open("../saved_data/joints_gen_angles.csv", ios::out|ios::app);
+    outfile_angles.open("../saved_data/joints_gen_angles.csv", ios::out | ios::app);
     outfile_angles << to_string(ANGLE_FRAME_ROW_COUNT) << ",";
-    for(std::vector<float>::iterator it = joint_angles.begin(); it != joint_angles.end(); it++)
+    for (std::vector<float>::iterator it = joint_angles.begin(); it != joint_angles.end(); it++)
     {
-        outfile_angles << *it*180/M_PI << ",";
-        angle = (char)(index+65);
-        cv::putText(main, angle+": "+to_string(*it*180/M_PI), cv::Point(main.cols-200, 30+offset), FONT_HERSHEY_DUPLEX, 1, COLORS_darkorange, 1);
+        outfile_angles << *it * 180 / M_PI << ",";
+
+        // display the angles
+        angle = (char)(index + 65);
+        cv::putText(main, angle + ": " + to_string(*it * 180 / M_PI), cv::Point(main.cols - 200, 30 + offset), FONT_HERSHEY_DUPLEX, 1, COLORS_darkorange, 1);
+
         offset += 30;
         index++;
     }
     ANGLE_FRAME_ROW_COUNT++;
     outfile_angles << std::endl;
     outfile_angles.close();
+    // joint angles END
 
-    // convert to point coordinates and 
-    for (int joint=0; joint < (int)K4ABT_JOINT_COUNT; joint++)
+    // projection START
+    for (int joint = 0; joint < (int)K4ABT_JOINT_COUNT; joint++)
     {
-        // for R,T (for 2-D projection from 3-D)
-        mainstream.at<float>(0,joint) = main_body.skeleton.joints[joint].position.v[0];
-        mainstream.at<float>(1,joint) = main_body.skeleton.joints[joint].position.v[1];
-        mainstream.at<float>(2,joint) = main_body.skeleton.joints[joint].position.v[2];
-        avgstream.at<float>(0,joint) = avg_body.skeleton.joints[joint].position.v[0];
-        avgstream.at<float>(1,joint) = avg_body.skeleton.joints[joint].position.v[1];
-        avgstream.at<float>(2,joint) = avg_body.skeleton.joints[joint].position.v[2];
+        // for R,T calculation (for 2-D projection from 3-D)
+        mainstream.at<float>(0, joint) = main_body.skeleton.joints[joint].position.v[0];
+        mainstream.at<float>(1, joint) = main_body.skeleton.joints[joint].position.v[1];
+        mainstream.at<float>(2, joint) = main_body.skeleton.joints[joint].position.v[2];
+        avgstream.at<float>(0, joint) = avg_body.skeleton.joints[joint].position.v[0];
+        avgstream.at<float>(1, joint) = avg_body.skeleton.joints[joint].position.v[1];
+        avgstream.at<float>(2, joint) = avg_body.skeleton.joints[joint].position.v[2];
 
-        // for visualization of only using master vs. all averaged
-        main_points.push_back(cv::Point3f(main_body.skeleton.joints[joint].position.v[0],main_body.skeleton.joints[joint].position.v[1],main_body.skeleton.joints[joint].position.v[2]));
-        avg_points.push_back(cv::Point3d(avg_body.skeleton.joints[joint].position.v[0],avg_body.skeleton.joints[joint].position.v[1],avg_body.skeleton.joints[joint].position.v[2]));
+        // points to project from (3-D)
+        main_points.push_back(cv::Point3f(main_body.skeleton.joints[joint].position.v[0], main_body.skeleton.joints[joint].position.v[1], main_body.skeleton.joints[joint].position.v[2]));
+        avg_points.push_back(cv::Point3d(avg_body.skeleton.joints[joint].position.v[0], avg_body.skeleton.joints[joint].position.v[1], avg_body.skeleton.joints[joint].position.v[2]));
     }
 
     // Compute R, T from secondary to main coordinate space
     Mat R;
     Mat T;
-    arun(avgstream,mainstream, R, T); // R: [3x3], T: [1x3]
+    arun(avgstream, mainstream, R, T); // R: [3x3], T: [1x3]
 
     // Create zero distortion
-    cv::Mat distCoeffs(4,1,CV_32F);
+    cv::Mat distCoeffs(4, 1, CV_32F);
     distCoeffs.at<float>(0) = 0;
     distCoeffs.at<float>(1) = 0;
     distCoeffs.at<float>(2) = 0;
     distCoeffs.at<float>(3) = 0;
 
     std::vector<cv::Point2f> projectedPointsMain, projectedPointsAvg;
-    cv::Mat rvecR(3,1,cv::DataType<double>::type);//rodrigues rotation matrix
-    cv::Rodrigues(R,rvecR);
-    
+    cv::Mat rvecR(3, 1, cv::DataType<double>::type); //rodrigues rotation matrix [1x3]
+    cv::Rodrigues(R, rvecR);
+
+    // project 3-D coordinates onto 2-D plane
     std::cerr << "projecting 3-D to 2-D..." << std::endl;
     cv::projectPoints(main_points, rvecR, T, Mat(main_intrinsic_matrix), distCoeffs, projectedPointsMain);
     cv::projectPoints(avg_points, rvecR, T, Mat(main_intrinsic_matrix), distCoeffs, projectedPointsAvg);
+    // projection END
 
+    // plotting joints START
     std::cerr << "plotting joints..." << std::endl;
     for (int i = 0; i < (int)K4ABT_JOINT_COUNT; i++)
     {
@@ -1375,11 +1411,11 @@ void plotBody(k4abt_body_t main_body, k4abt_body_t avg_body, cv::Mat main, cv::M
         int radius = 3;
         // cv::Point center1 = cv::Point(main_position.xyz.x, main_position.xyz.y);
         cv::Point center1 = projectedPointsMain[i];
-        center1 = cv::Point(center1.x+offsetx, center1.y+offsety);
+        center1 = cv::Point(center1.x + offsetx, center1.y + offsety);
         dataMain.push_back(center1);
         cv::Scalar color = COLORS_red;
         cv::circle(main, center1, radius, color, CV_FILLED);
-        cv::putText(main, to_string(i), center1, FONT_HERSHEY_DUPLEX, 1, Scalar(0,143,143), 2);
+        cv::putText(main, to_string(i), center1, FONT_HERSHEY_DUPLEX, 1, Scalar(0, 143, 143), 2);
 
         // cv::namedWindow("cv_main_color_image", CV_WINDOW_AUTOSIZE);
         // cv::imshow("cv_main_color_image", main);
@@ -1388,38 +1424,39 @@ void plotBody(k4abt_body_t main_body, k4abt_body_t avg_body, cv::Mat main, cv::M
         // plot 2D points for averaged
         radius = 5;
         cv::Point center0 = projectedPointsAvg[i];
-        center0 = cv::Point(center0.x+offsetx, center0.y+offsety);
+        center0 = cv::Point(center0.x + offsetx, center0.y + offsety);
         dataAvg.push_back(center0);
         color = COLORS_green;
         cv::circle(main, center0, radius, color, CV_FILLED);
-        cv::putText(main, to_string(i), center0, FONT_HERSHEY_DUPLEX, 1, Scalar(0,143,143), 2);
+        cv::putText(main, to_string(i), center0, FONT_HERSHEY_DUPLEX, 1, Scalar(0, 143, 143), 2);
 
         // cv::namedWindow("cv_main_color_image", CV_WINDOW_AUTOSIZE);
         // cv::imshow("cv_main_color_image", main);
         // cv::waitKey(1);
     }
-    
+
     // draws lines between joints for both main and secondary streams
+    std::cerr << "connecting joints with lines..." << std::endl;
     cv::Scalar color;
-    int counter= 0, thickness = 0;
+    int counter = 0, thickness = 0;
     std::list<std::vector<cv::Point>> datalist{dataMain, dataAvg};
     std::vector<cv::Mat> imgList{main};
     for (auto stream : datalist)
     {
         switch (counter)
         {
-            case 0: // main
-                color = COLORS_red;
-                thickness = 5;
-                // std::cerr<<std::endl<<"plotting for master"<<std::endl;
-                break;
-            case 1: // avg
-                color = COLORS_green;
-                thickness = 3;
-                // std::cerr<<std::endl<<"plotting for averaged"<<std::endl;
-                break;
+        case 0: // main
+            color = COLORS_red;
+            thickness = 5;
+            // std::cerr<<std::endl<<"plotting for master"<<std::endl;
+            break;
+        case 1: // avg
+            color = COLORS_green;
+            thickness = 3;
+            // std::cerr<<std::endl<<"plotting for averaged"<<std::endl;
+            break;
         }
-        
+
         // [child]: child joint to parent joint
         // imgList: main, secondary views
         // stream: joint positions
@@ -1490,28 +1527,30 @@ void plotBody(k4abt_body_t main_body, k4abt_body_t avg_body, cv::Mat main, cv::M
 
         counter += 1;
     }
+    // plotting joints END
+
+    // display
     cv::namedWindow("main color camera", CV_WINDOW_AUTOSIZE);
     cv::putText(imgList.at(0), "[master device] red", cv::Point(30, 30), CV_FONT_HERSHEY_PLAIN, 1.5, COLORS_red, 2, 8, false);
-    cv::putText(imgList.at(0), "[3 in sync] green", cv::Point(30, 70), CV_FONT_HERSHEY_PLAIN, 1.5, COLORS_green, 2, 8, false);
+    cv::putText(imgList.at(0), "[synced] green", cv::Point(30, 70), CV_FONT_HERSHEY_PLAIN, 1.5, COLORS_green, 2, 8, false);
     cv::imshow("main color camera", imgList.at(0));
     cv::waitKey(1);
 }
 
+/*
+    transforms one body stream to another
+ */
 void transform_body(k4abt_body_t &main_body, k4abt_body_t &secondary_body)
 {
     // called per frame, for data stream containing body objects with 32 positions, orientations
     // transform secondary to main body space coordinates
-    // using Arun's method for computing Rotation and Translation Matrices from positions (for 3dof) / orientations (for 6dof)
-
-    // for each joint object
-    // k4a_float3_t main_position, secondary_position;
-    // k4a_quaternion_t main_quaternion, secondary_quaternion;
+    // using Arun's method for computing R, T matrices from positions (for 3dof)
 
     // main, secondary: [3 x #_joints]
     Mat main(3, K4ABT_JOINT_COUNT, CV_32F), secondary(3, K4ABT_JOINT_COUNT, CV_32F);
     for (int joint = 0; joint < (int)K4ABT_JOINT_COUNT; joint++)
     {
-        // print current positions
+        // // print current positions
         // std::cout << "main x,y,z: " << main_body.skeleton.joints[joint].position.xyz.x << "\t" << main_body.skeleton.joints[joint].position.xyz.y << "\t" << main_body.skeleton.joints[joint].position.xyz.z << std::endl;
         // std::cout << "secondary x,y,z: " << secondary_body.skeleton.joints[joint].position.xyz.x << "\t" << secondary_body.skeleton.joints[joint].position.xyz.y << "\t" << secondary_body.skeleton.joints[joint].position.xyz.z << std::endl;
 
@@ -1523,8 +1562,7 @@ void transform_body(k4abt_body_t &main_body, k4abt_body_t &secondary_body)
         secondary.at<float>(2, joint) = secondary_body.skeleton.joints[joint].position.v[2];
     }
 
-    // ====Apply transformation====
-    // R, T from secondary to main coordinate space
+    // compute R, T that give the transformation matrix from secondary to main coordinate space
     Mat R, T;
     arun(secondary, main, R, T); // R: [3x3], T: [1x3]
 
@@ -1535,7 +1573,7 @@ void transform_body(k4abt_body_t &main_body, k4abt_body_t &secondary_body)
     Mat secondary_tf;
     cv::add(R * secondary, T_rep, secondary_tf);
 
-    // reassign body object with transformed positions
+    // update secondary body object with transformed positions
     for (int joint = 0; joint < (int)K4ABT_JOINT_COUNT; joint++)
     {
         secondary_body.skeleton.joints[joint].position.v[0] = secondary_tf.at<float>(0, joint);
@@ -1544,6 +1582,9 @@ void transform_body(k4abt_body_t &main_body, k4abt_body_t &secondary_body)
     }
 }
 
+/*
+    compute R and T extrinsic matrix components using least squares fitting of two 3-D point sets
+ */
 void arun(Mat &streamfrom, Mat &streamto, Mat &R, Mat &T)
 {
     // find mean across the row (all joints for each x,y,z)
@@ -1577,10 +1618,12 @@ void arun(Mat &streamfrom, Mat &streamto, Mat &R, Mat &T)
     {
         T = Mat(1, 3, CV_32F, Scalar(1, 1, 1));
     }
-    // R: [3x3], T: [3x1]
-    // std::cout << endl << "R "<<R.size()<<" : \n" << R << "\nT "<<T.size()<<" :\n" << T << std::endl;
+    // final sizes:: R: [3x3], T: [3x1]
 }
 
+/* 
+    take average positions from 2 position (x,y,z) tuples
+*/
 k4a_float3_t get_average_position_xyz(k4a_float3_t main_position, k4a_float3_t secondary_position, int main_or_secondary)
 {
     k4a_float3_t avgPosition;
@@ -1605,6 +1648,9 @@ k4a_float3_t get_average_position_xyz(k4a_float3_t main_position, k4a_float3_t s
     return avgPosition;
 }
 
+/*
+    take average orientations from 2 quaternions
+ */
 k4a_quaternion_t get_average_quaternion_xyzw(k4a_quaternion_t main_quaternion, k4a_quaternion_t secondary_quaternion, int main_or_secondary)
 {
     k4a_quaternion_t avgQuaternion;
@@ -1630,6 +1676,9 @@ k4a_quaternion_t get_average_quaternion_xyzw(k4a_quaternion_t main_quaternion, k
     return avgQuaternion;
 }
 
+/*
+    translate confidence level enum to string representation
+ */
 string confidenceEnumMapping(k4abt_joint_confidence_level_t confidence_level)
 {
     string resultString;

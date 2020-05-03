@@ -15,18 +15,18 @@ onerun:
 # 	g++ multi.cpp  $(K4A_FLAGS) $(K4ABT_FLAGS)  $(OPENCV_FLAGS) -o $(OUTPUT_FILENAME)
 
 # multirun: 
-# 	./$(OUTPUT_FILENAME) 2 9 6 15 1
+# 	./$(OUTPUT_FILENAME) 2 9 6 15
 
 # transformed, projected, synced, 2 devices
 two:
 	g++ two.cpp $(K4A_FLAGS) $(K4ABT_FLAGS)  $(OPENCV_FLAGS) -o $(OUTPUT_FILENAME)
 
 tworun:
-	./$(OUTPUT_FILENAME) 2 9 6 15 1
+	./$(OUTPUT_FILENAME) 2 9 6 15
 
 # transformed, projected, synced, 3 devices
 sync:
 	g++ sync.cpp $(K4A_FLAGS) $(K4ABT_FLAGS)  $(OPENCV_FLAGS) -o $(OUTPUT_FILENAME)
 
 syncrun:
-	./$(OUTPUT_FILENAME) 3 9 6 15 1
+	./$(OUTPUT_FILENAME) 3 9 6 15
