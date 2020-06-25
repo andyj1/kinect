@@ -14,7 +14,9 @@ _Keywords_: Motion capture (MOCAP) system, synchronization, Kinect, body-trackin
 
 > Link to submitted abstract to ACM SIGGRAPH'20: [Abstract](doc/abstract_SIGGRAPH2020.pdf)
 
-> Link to updated documentation: [Documentation](doc/kinect_documentation.pdf)
+(Received 4 feedback; 3 neutral, 1 slight negative)
+
+> Link to documentation: [Documentation](doc/kinect_documentation.pdf)
 
 ### Demo
 
