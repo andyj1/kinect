@@ -49,11 +49,11 @@ class sync{
         k4a_float3_t get_average_position_xyz(k4a_float3_t main_position, k4a_float3_t secondary_position, int main_or_secondary);
         k4a_quaternion_t get_average_quaternion_xyzw(k4a_quaternion_t main_quaternion, k4a_quaternion_t secondary_quaternion, int main_or_secondar);
         int get_average_confidence(k4abt_joint_confidence_level_t mainCI, k4abt_joint_confidence_level_t secondaryCI);
-        string confidenceEnumMapping(k4abt_joint_confidence_level_t confidence_level);
+        string confidenceMap(k4abt_joint_confidence_level_t confidence_level);
 
         void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body, cv::Mat& main, cv::Mat& secondary, cv::Matx33f main_intrinsic_matrix);
         void plotBody(std::vector<cv::Point> dataMain, std::vector<cv::Point> dataSecondary, std::vector<cv::Point> dataAvg, cv::Mat main, cv::Mat secondary);
-        void transform_body(k4abt_body_t& main_body, k4abt_body_t& secondary_body);
+        void transformBody(k4abt_body_t& main_body, k4abt_body_t& secondary_body);
         void arun(Mat& main, Mat& secondary, Mat& R, Mat& T);
 
     private:

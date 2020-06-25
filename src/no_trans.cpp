@@ -65,10 +65,10 @@ void print_body_index_map_middle_line(k4a::image body_index_map);
 k4a_float3_t get_average_position_xyz(k4a_float3_t main_position, k4a_float3_t secondary_position, int main_or_secondary);
 k4a_quaternion_t get_average_quaternion_xyzw(k4a_quaternion_t main_quaternion, k4a_quaternion_t secondary_quaternion, int main_or_secondar);
 int get_average_confidence(k4abt_joint_confidence_level_t mainCI, k4abt_joint_confidence_level_t secondaryCI);
-string confidenceEnumMapping(k4abt_joint_confidence_level_t confidence_level);
+string confidenceMap(k4abt_joint_confidence_level_t confidence_level);
 
 void processBodyData(k4abt_body_t main_body, vector<vector<k4abt_body_t>> secondary_body_vector, cv::Mat &main, cv::Matx33f main_intrinsic_matrix, vector<int> validSubDevices);
-void transform_body(k4abt_body_t &main_body, k4abt_body_t &secondary_body);
+void transformBody(k4abt_body_t &main_body, k4abt_body_t &secondary_body);
 void arun(Mat &main, Mat &secondary, Mat &R, Mat &T);
 void plotBody(k4abt_body_t main_body, k4abt_body_t avg_body, cv::Mat main, cv::Matx33f main_intrinsic_matrix);
 std::vector<float> computeJointAngles(k4abt_body_t avg_body);
@@ -287,7 +287,7 @@ int main(int argc, char **argv)
                             k4abt_joint_confidence_level_t main_confidence_level = main_body.skeleton.joints[i].confidence_level;
                             if (outfile_orig.is_open())
                             {
-                                outfile_orig << main_body.id << "," << i << "," << main_position.v[0] << "," << main_position.v[1] << "," << main_position.v[2] << "," << main_orientation.v[0] << "," << main_orientation.v[1] << "," << main_orientation.v[2] << "," << main_orientation.v[3] << "," << confidenceEnumMapping(main_confidence_level) << "," << std::endl;
+                                outfile_orig << main_body.id << "," << i << "," << main_position.v[0] << "," << main_position.v[1] << "," << main_position.v[2] << "," << main_orientation.v[0] << "," << main_orientation.v[1] << "," << main_orientation.v[2] << "," << main_orientation.v[3] << "," << confidenceMap(main_confidence_level) << "," << std::endl;
                             }
                         }
                     }
@@ -397,7 +397,7 @@ int main(int argc, char **argv)
                                 validSubDevices.push_back(sdev);
 
                                 // transform sub to master and store directly
-                                // transform_body(main_body, secondary_body_vector[sdev][body_idx]);
+                                // transformBody(main_body, secondary_body_vector[sdev][body_idx]);
 
                                 // for each body, store joints data in csv
                                 for (int i = 0; i < (int)K4ABT_JOINT_COUNT; i++)
@@ -410,7 +410,7 @@ int main(int argc, char **argv)
                                         k4abt_joint_confidence_level_t sub1_confidence_level = secondary_body_vector[0][body_idx].skeleton.joints[i].confidence_level;
                                         if (outfile_sub1.is_open())
                                         {
-                                            outfile_sub1 << secondary_body_vector[0][body_idx].id << "," << i << "," << sub1_position.v[0] << "," << sub1_position.v[1] << "," << sub1_position.v[2] << "," << sub1_orientation.v[0] << "," << sub1_orientation.v[1] << "," << sub1_orientation.v[2] << "," << sub1_orientation.v[3] << "," << confidenceEnumMapping(sub1_confidence_level) << "," << std::endl;
+                                            outfile_sub1 << secondary_body_vector[0][body_idx].id << "," << i << "," << sub1_position.v[0] << "," << sub1_position.v[1] << "," << sub1_position.v[2] << "," << sub1_orientation.v[0] << "," << sub1_orientation.v[1] << "," << sub1_orientation.v[2] << "," << sub1_orientation.v[3] << "," << confidenceMap(sub1_confidence_level) << "," << std::endl;
                                         }
                                     } else if (sdev == 1) 
                                     // store subsequent sub device joints data
@@ -420,7 +420,7 @@ int main(int argc, char **argv)
                                         k4abt_joint_confidence_level_t sub2_confidence_level = secondary_body_vector[1][body_idx].skeleton.joints[i].confidence_level;
                                         if (outfile_sub2.is_open())
                                         {
-                                            outfile_sub2 << secondary_body_vector[1][body_idx].id << "," << i << "," << sub2_position.v[0] << "," << sub2_position.v[1] << "," << sub2_position.v[2] << "," << sub2_orientation.v[0] << "," << sub2_orientation.v[1] << "," << sub2_orientation.v[2] << "," << sub2_orientation.v[3] << "," << confidenceEnumMapping(sub2_confidence_level) << "," << std::endl;
+                                            outfile_sub2 << secondary_body_vector[1][body_idx].id << "," << i << "," << sub2_position.v[0] << "," << sub2_position.v[1] << "," << sub2_position.v[2] << "," << sub2_orientation.v[0] << "," << sub2_orientation.v[1] << "," << sub2_orientation.v[2] << "," << sub2_orientation.v[3] << "," << confidenceMap(sub2_confidence_level) << "," << std::endl;
                                         }
                                     }                    
                                 } // end for loop
@@ -1107,7 +1107,7 @@ void processBodyData(k4abt_body_t main_body, vector<vector<k4abt_body_t>> second
 
             if (outfile_avg.is_open())
             {
-                outfile_avg << avg_body.id << "," << i << "," << avg_position.v[0] << "," << avg_position.v[1] << "," << avg_position.v[2] << "," << avg_orientation.v[0] << "," << avg_orientation.v[1] << "," << avg_orientation.v[2] << "," << avg_orientation.v[3] << "," << confidenceEnumMapping(avg_confidence_level) << "," << std::endl;
+                outfile_avg << avg_body.id << "," << i << "," << avg_position.v[0] << "," << avg_position.v[1] << "," << avg_position.v[2] << "," << avg_orientation.v[0] << "," << avg_orientation.v[1] << "," << avg_orientation.v[2] << "," << avg_orientation.v[3] << "," << confidenceMap(avg_confidence_level) << "," << std::endl;
             }
         }
         outfile_avg.close();
@@ -1497,7 +1497,7 @@ void plotBody(k4abt_body_t main_body, k4abt_body_t avg_body, cv::Mat main, cv::M
     cv::waitKey(1);
 }
 
-void transform_body(k4abt_body_t &main_body, k4abt_body_t &secondary_body)
+void transformBody(k4abt_body_t &main_body, k4abt_body_t &secondary_body)
 {
     // called per frame, for data stream containing body objects with 32 positions, orientations
     // transform secondary to main body space coordinates
@@ -1630,7 +1630,7 @@ k4a_quaternion_t get_average_quaternion_xyzw(k4a_quaternion_t main_quaternion, k
     return avgQuaternion;
 }
 
-string confidenceEnumMapping(k4abt_joint_confidence_level_t confidence_level)
+string confidenceMap(k4abt_joint_confidence_level_t confidence_level)
 {
     string resultString;
     switch (confidence_level)

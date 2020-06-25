@@ -43,9 +43,15 @@ public:
             cerr << "Capturer must be passed at least one camera!\n ";
             exit(1);
         }
+    
         for (uint32_t i : device_indices)
         {
             k4a::device next_device = k4a::device::open(i); // construct a device using this index
+            std::cerr << "Dev index: "<< i << " out of " << device_indices.size() << "\t";
+            std::cerr << "in: " << next_device.is_sync_in_connected() << "\t";
+            std::cerr << "out: " << next_device.is_sync_out_connected() << "\t";
+            std::cerr << "master found: " << master_found << std::endl;
+
             // If you want to synchronize cameras, you need to manually set both their exposures
             next_device.set_color_control(K4A_COLOR_CONTROL_EXPOSURE_TIME_ABSOLUTE,
                                           K4A_COLOR_CONTROL_MODE_MANUAL,
@@ -58,7 +64,7 @@ public:
                                           powerline_freq);
             // We treat the first device found with a sync out cable attached as the master. If it's not supposed to be,
             // unplug the cable from it. Also, if there's only one device, just use it
-            if ((next_device.is_sync_out_connected() && !master_found) || device_indices.size() == 1)
+            if ((!next_device.is_sync_in_connected() && next_device.is_sync_out_connected() && !master_found) || device_indices.size() == 1)
             {
                 master_device = std::move(next_device);
                 master_found = true;
@@ -70,10 +76,10 @@ public:
             }
             else if (!next_device.is_sync_in_connected())
             {
-                cerr << "Non-master camera found that doesn't have the sync in port connected!\n ";
+                cerr << "Subordinate camera found that doesn't have the sync in port connected!\n ";
                 exit(1);
             }
-            else
+            else if (next_device.is_sync_in_connected())
             {
                 subordinate_devices.emplace_back(std::move(next_device));
             }
@@ -83,6 +89,7 @@ public:
             cerr << "No device with sync out connected found!\n ";
             exit(1);
         }
+        std::cerr << "size of subs: " << subordinate_devices.size() << std::endl;
     }
 
     // configs[0] should be the master, the rest subordinate

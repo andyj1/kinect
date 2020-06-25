@@ -29,7 +29,7 @@
 //
 //using namespace std;
 //
-//string confidenceEnumMapping(k4abt_joint_confidence_level_t confidence_level)
+//string confidenceMap(k4abt_joint_confidence_level_t confidence_level)
 //{
 //	string resultString;
 //	switch (confidence_level)
@@ -152,7 +152,7 @@
 //							 	outfile << "[orientation] (x-y-z-w)," << long float((&skeleton)->joints->orientation.wxyz.x) << ", " << long float((&skeleton)->joints->orientation.wxyz.y) << ", " << long float((&skeleton)->joints->orientation.wxyz.z) << ", " << long float((&skeleton)->joints->orientation.wxyz.w) << endl;
 //							 	outfile << "[orientation] Vector array," << *(&skeleton)->joints->orientation.v << endl;
 //
-//							 	outfile << "[confidence level]," << (&skeleton)->joints->confidence_level << ", " << confidenceEnumMapping((&skeleton)->joints->confidence_level) << endl;
+//							 	outfile << "[confidence level]," << (&skeleton)->joints->confidence_level << ", " << confidenceMap((&skeleton)->joints->confidence_level) << endl;
 //
 //							 }
 //							 // type float

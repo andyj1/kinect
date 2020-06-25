@@ -32,7 +32,7 @@ using namespace std;
 
 static vector<double> values;
 
-string confidenceEnumMapping(k4abt_joint_confidence_level_t confidence_level)
+string confidenceMap(k4abt_joint_confidence_level_t confidence_level)
 {
 	string resultString;
 	switch (confidence_level)
@@ -131,10 +131,10 @@ int main()
 								k4a_quaternion_t orientation = body.skeleton.joints[i].orientation;
 								k4abt_joint_confidence_level_t confidence_level = body.skeleton.joints[i].confidence_level;
 								
-								//outfile << *(it) << "," << *(it + 1) << "," << *(it + 2) << "," << *(it + 3) << "," << *(it + 4) << "," << *(it + 5) << "," << *(it + 6) << "," << *(it + 7) << "," << confidenceEnumMapping (int(*(it + 8))) << "," << endl;
+								//outfile << *(it) << "," << *(it + 1) << "," << *(it + 2) << "," << *(it + 3) << "," << *(it + 4) << "," << *(it + 5) << "," << *(it + 6) << "," << *(it + 7) << "," << confidenceMap (int(*(it + 8))) << "," << endl;
 								if (outfile.is_open())
 								{
-									outfile << body.id << "," << i << "," << position.v[0] << "," << position.v[1] << "," << position.v[2] << "," << orientation.v[0] << "," << orientation.v[1] << "," << orientation.v[2] << "," << orientation.v[3] << "," << confidenceEnumMapping(confidence_level) << "," << endl;
+									outfile << body.id << "," << i << "," << position.v[0] << "," << position.v[1] << "," << position.v[2] << "," << orientation.v[0] << "," << orientation.v[1] << "," << orientation.v[2] << "," << orientation.v[3] << "," << confidenceMap(confidence_level) << "," << endl;
 								}
 
 							}

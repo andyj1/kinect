@@ -65,11 +65,11 @@ void print_body_index_map_middle_line(k4a::image body_index_map);
 k4a_float3_t get_average_position_xyz(k4a_float3_t main_position, k4a_float3_t secondary_position, int main_or_secondary);
 k4a_quaternion_t get_average_quaternion_xyzw(k4a_quaternion_t main_quaternion, k4a_quaternion_t secondary_quaternion, int main_or_secondar);
 int get_average_confidence(k4abt_joint_confidence_level_t mainCI, k4abt_joint_confidence_level_t secondaryCI);
-string confidenceEnumMapping(k4abt_joint_confidence_level_t confidence_level);
+string confidenceMap(k4abt_joint_confidence_level_t confidence_level);
 
 void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body, cv::Mat& main, cv::Mat& secondary, cv::Matx33f main_intrinsic_matrix);
 void plotBody(std::vector<cv::Point> dataMain, std::vector<cv::Point> dataSecondary, std::vector<cv::Point> dataAvg, cv::Mat main, cv::Mat secondary);
-void transform_body(k4abt_body_t& main_body, k4abt_body_t& secondary_body);
+void transformBody(k4abt_body_t& main_body, k4abt_body_t& secondary_body);
 void arun(Mat& main, Mat& secondary, Mat& R, Mat& T);
 
 int main(int argc, char **argv)
@@ -396,16 +396,16 @@ int main(int argc, char **argv)
 
                                 if (outfile.is_open())
                                 {
-                                    outfile << main_body.id << "," << i << "," << main_position.v[0] << "," << main_position.v[1] << "," << main_position.v[2] << "," << main_orientation.v[0] << "," << main_orientation.v[1] << "," << main_orientation.v[2] << "," << main_orientation.v[3] << "," << confidenceEnumMapping(main_confidence_level) << "," << std::endl;
+                                    outfile << main_body.id << "," << i << "," << main_position.v[0] << "," << main_position.v[1] << "," << main_position.v[2] << "," << main_orientation.v[0] << "," << main_orientation.v[1] << "," << main_orientation.v[2] << "," << main_orientation.v[3] << "," << confidenceMap(main_confidence_level) << "," << std::endl;
                                 }
                                 if (outfile2.is_open())
                                 {
-                                    outfile2 << secondary_body.id << "," << i << "," << secondary_position.v[0] << "," << secondary_position.v[1] << "," << secondary_position.v[2] << "," << secondary_orientation.v[0] << "," << secondary_orientation.v[1] << "," << secondary_orientation.v[2] << "," << secondary_orientation.v[3] << "," << confidenceEnumMapping(secondary_confidence_level) << "," << std::endl;
+                                    outfile2 << secondary_body.id << "," << i << "," << secondary_position.v[0] << "," << secondary_position.v[1] << "," << secondary_position.v[2] << "," << secondary_orientation.v[0] << "," << secondary_orientation.v[1] << "," << secondary_orientation.v[2] << "," << secondary_orientation.v[3] << "," << confidenceMap(secondary_confidence_level) << "," << std::endl;
                                 }
                             }
 
                             // apply transformation to secondary to convert to main color camera space
-                            transform_body(main_body, secondary_body);
+                            transformBody(main_body, secondary_body);
 
                             // insert transformed joints data stream
                             for (int i = 0; i < (int)K4ABT_JOINT_COUNT; i++)
@@ -416,7 +416,7 @@ int main(int argc, char **argv)
 
                                 if (outfile_sync.is_open())
                                 {
-                                    outfile_sync << secondary_body.id << "," << i << "," << secondary_tf_position.v[0] << "," << secondary_tf_position.v[1] << "," << secondary_tf_position.v[2] << "," << secondary_tf_orientation.v[0] << "," << secondary_tf_orientation.v[1] << "," << secondary_tf_orientation.v[2] << "," << secondary_tf_orientation.v[3] << "," << confidenceEnumMapping(secondary_tf_confidence_level) << "," << std::endl;
+                                    outfile_sync << secondary_body.id << "," << i << "," << secondary_tf_position.v[0] << "," << secondary_tf_position.v[1] << "," << secondary_tf_position.v[2] << "," << secondary_tf_orientation.v[0] << "," << secondary_tf_orientation.v[1] << "," << secondary_tf_orientation.v[2] << "," << secondary_tf_orientation.v[3] << "," << confidenceMap(secondary_tf_confidence_level) << "," << std::endl;
                                 }
                             }
                             
@@ -1250,7 +1250,7 @@ void plotBody(std::vector<cv::Point> dataMain, std::vector<cv::Point> dataSecond
     cv::waitKey(1);
 }
 
-void transform_body(k4abt_body_t& main_body, k4abt_body_t& secondary_body)
+void transformBody(k4abt_body_t& main_body, k4abt_body_t& secondary_body)
 {
     // called per frame, for data stream containing body objects with 32 positions, orientations
     // transform secondary to main body space coordinates
@@ -1442,7 +1442,7 @@ int get_average_confidence(k4abt_joint_confidence_level_t main_confidence_level,
     return main_or_secondary;
 }
 
-string confidenceEnumMapping(k4abt_joint_confidence_level_t confidence_level)
+string confidenceMap(k4abt_joint_confidence_level_t confidence_level)
 {
 	string resultString;
 	switch (confidence_level)

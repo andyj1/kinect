@@ -67,7 +67,7 @@ void print_body_index_map_middle_line(k4a::image body_index_map);
 k4a_float3_t get_average_position_xyz(k4a_float3_t main_position, k4a_float3_t secondary_position, int main_or_secondary);
 k4a_quaternion_t get_average_quaternion_xyzw(k4a_quaternion_t main_quaternion, k4a_quaternion_t secondary_quaternion, int main_or_secondar);
 int get_average_confidence(k4abt_joint_confidence_level_t mainCI, k4abt_joint_confidence_level_t secondaryCI);
-string confidenceEnumMapping(k4abt_joint_confidence_level_t confidence_level);
+string confidenceMap(k4abt_joint_confidence_level_t confidence_level);
 
 void plotBody(std::vector<cv::Point> dataMain, std::vector<cv::Point> dataSecondary, cv::Mat main, cv::Mat secondary);
 
@@ -843,7 +843,7 @@ void print_body_information(k4abt_body_t main_body, k4abt_body_t secondary_body,
 
         if (outfile.is_open())
         {
-            outfile << main_body.id << "," << i << "," << avgPos.v[0] << "," << avgPos.v[1] << "," << avgPos.v[2] << "," << avgQuaternion.v[0] << "," << avgQuaternion.v[1] << "," << avgQuaternion.v[2] << "," << avgQuaternion.v[3] << "," << confidenceEnumMapping(avgCI) << "," << endl;
+            outfile << main_body.id << "," << i << "," << avgPos.v[0] << "," << avgPos.v[1] << "," << avgPos.v[2] << "," << avgQuaternion.v[0] << "," << avgQuaternion.v[1] << "," << avgQuaternion.v[2] << "," << avgQuaternion.v[3] << "," << confidenceMap(avgCI) << "," << endl;
         }
     }
     plotBody(dataMain, dataSecondary, main, secondary);
@@ -1024,7 +1024,7 @@ int get_average_confidence(k4abt_joint_confidence_level_t main_confidence_level,
     return main_or_secondary;
 }
 
-string confidenceEnumMapping(k4abt_joint_confidence_level_t confidence_level)
+string confidenceMap(k4abt_joint_confidence_level_t confidence_level)
 {
 	string resultString;
 	switch (confidence_level)

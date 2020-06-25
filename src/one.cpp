@@ -41,7 +41,7 @@ using namespace color;
 static cv::Mat color_to_opencv(const k4a::image &im);
 void arun(Mat &main, Mat &secondary, Mat &R, Mat &T);
 std::vector<float> computeJointAngles(k4abt_body_t body);
-string confidenceEnumMapping(k4abt_joint_confidence_level_t confidence_level);
+string confidenceMap(k4abt_joint_confidence_level_t confidence_level);
 vector<double> print_body_information(k4abt_body_t body);
 void crossproduct (cv::Vec3f &ans, cv::Vec3f &p1, cv::Vec3f &p2);
 
@@ -49,7 +49,7 @@ void crossproduct (cv::Vec3f &ans, cv::Vec3f &p1, cv::Vec3f &p2);
 static int ANGLE_FRAME_ROW_COUNT = 0;
 static vector<double> values;
 
-string confidenceEnumMapping(k4abt_joint_confidence_level_t confidence_level)
+string confidenceMap(k4abt_joint_confidence_level_t confidence_level)
 {
 	string resultString;
 	switch (confidence_level)
@@ -333,7 +333,7 @@ int main()
 							
 							if (outfile.is_open())
 							{
-								outfile << body.id << "," << i << "," << position.v[0] << "," << position.v[1] << "," << position.v[2] << "," << orientation.v[0] << "," << orientation.v[1] << "," << orientation.v[2] << "," << orientation.v[3] << "," << confidenceEnumMapping(confidence_level) << "," << endl;
+								outfile << body.id << "," << i << "," << position.v[0] << "," << position.v[1] << "," << position.v[2] << "," << orientation.v[0] << "," << orientation.v[1] << "," << orientation.v[2] << "," << orientation.v[3] << "," << confidenceMap(confidence_level) << "," << endl;
 							}
 
 						}

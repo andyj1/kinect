@@ -10,12 +10,13 @@ one:
 onerun: 
 	./$(OUTPUT_FILENAME)
 
-# transformed, not projected, synced, 2 devices
-# multi:
-# 	g++ multi.cpp  $(K4A_FLAGS) $(K4ABT_FLAGS)  $(OPENCV_FLAGS) -o $(OUTPUT_FILENAME)
+stats:
+	g++ stats.cpp  $(K4A_FLAGS) $(K4ABT_FLAGS)  $(OPENCV_FLAGS) -o $(OUTPUT_FILENAME)
+	./$(OUTPUT_FILENAME)
 
-# multirun: 
-# 	./$(OUTPUT_FILENAME) 2 9 6 15
+gen:
+	g++ generalize_sync.cpp $(K4A_FLAGS) $(K4ABT_FLAGS) $(OPENCV_FLAGS) -o $(OUTPUT_FILENAME)
+	./$(OUTPUT_FILENAME) 3 9 6 15 
 
 # transformed, projected, synced, 2 devices
 two:
