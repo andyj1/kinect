@@ -146,3 +146,11 @@ The Azure Kinect SDK enables you to get the most out of your Azure Kinect camera
 ##### 3. Drone Movement Synchronzation from Human Pose
 
 > Control of drone system (crazyflie)
+
+
+## Star History
+
+[![Stargazers repo roster for @andyj1/kinect](https://bytecrank.com/nastyox/reporoster/php/stargazersSVG.php?user=andyj1&repo=kinect)]([https://github.com/NVlabs/MambaVision](https://github.com/andyj1/kinect)/stargazers)
+
+
+[![Star History Chart](https://api.star-history.com/svg?repos=andyj1/kinect&type=Date)](https://star-history.com/#andyj1/kinect&Date)
