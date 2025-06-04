@@ -1,6 +1,6 @@
 # A Low-Cost Motion Capture System using Synchronized Azure Kinect Systems
 
-by [Andy Jeong](mailto:jeong2cu@gmail.com), [Yue Wang](mailto:leowang1996@gmail.com), [Professor Mili Shah](mailto:mili.shah@cooper.edu) (Advisor)
+by [Jongoh Jeong (Andy)](mailto:jeong2cu@gmail.com), [Yue Wang (Leo)](mailto:leowang1996@gmail.com), [Professor Mili Shah](mailto:mili.shah@cooper.edu) (Advisor)
 
 **Abstract**
 
